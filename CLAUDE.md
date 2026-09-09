@@ -138,6 +138,106 @@ references `bun run` for `beforeDevCommand` / `beforeBuildCommand`.
 - `app.state.json` lives in the OS app-data dir; never put secrets there.
 - `providers` array is replaced wholesale by the user config (no per-id merge).
 
+## Best practices
+
+### Vue 3 (`<script setup lang="ts">`)
+
+- Always declare props/emits with the `defineProps<{...}>()` and
+  `defineEmits<{...}>()` type-only macros (not the runtime `defineProps({})`
+  form) so TS sees the types.
+- Prefer `ref()` for primitives and single values; use `reactive()` only when
+  grouping belongs together. Reach for `computed()` for any derived value;
+  do not maintain derived state with `watch()` + assignment.
+- Never mutate a prop. Emit an event or route through the store.
+- Keep SFCs shallow. Extract a child component when a file passes ~200 lines
+  or owns its own local state worth naming.
+- Composables (`useXxx`) for shared reactive logic; colocate with the store
+  if it owns global state.
+- No side effects inside `computed()` — use `watch()` / `watchEffect()` or
+  move it into an event handler.
+- No `any`. Use `unknown` + narrowing, or a precise type.
+- Use `v-model` shorthand only when you don't also need other listeners on
+  the same element. Otherwise bind `:value` + `@input` explicitly.
+- Reach for `nextTick()` only when a DOM measurement depends on a pending
+  reactive update.
+
+### Rust
+
+- Return `Result<T, AppError>` for anything that can fail at runtime.
+  `unwrap()` is fine in tests and `expect("invariant")` is fine at startup,
+  but never in a code path the frontend can hit.
+- `thiserror` for typed errors (`#[derive(Error)]` + `#[from]` for source
+  chaining). Don't use `anyhow` in library code.
+- `&str` over `String`, `&[T]` over `Vec<T>` for read-only parameters.
+- Iterator chains over imperative loops when they read clearly.
+- Public types and functions get a one-line doc comment that names the
+  design-doc section they implement, e.g. `/// §16.1 host whitelist`.
+- `#[serde(rename_all = "camelCase")]` + `deny_unknown_fields` on every wire
+  type — catches typos in the JSON config and stale fields after refactors.
+- Atomic file writes (write to `*.tmp`, then `rename`) for any persisted
+  state. Pair with a "corrupted → reset to empty defaults" read path.
+- No `panic!` in code paths that the frontend invokes; log and return
+  `AppError` instead.
+- Prefer flat module layout (`src/*.rs`, no nested folders) until a module
+  grows past ~500 lines.
+
+### Code quality
+
+- Comments explain WHY, not WHAT. The code already shows what.
+- Match the surrounding file's comment density, naming, and idiom. Don't
+  introduce a new style mid-file.
+- Small, testable, pure functions where possible. Push I/O to the edges.
+- One responsibility per module. If a file's top doc comment needs "and",
+  split it.
+- Naming is precise: `activeProvider`, not `currentProv`; `resolveActive`
+  not `doActive`. Don't abbreviate beyond the common ones (`id`, `ui`,
+  `ipc`, `cfg`).
+- Remove dead code. A `#[allow(dead_code)]` needs a comment explaining why
+  it stays.
+- No re-export to paper over a name; rename instead.
+
+### Security
+
+- Tauri capabilities (`src-tauri/capabilities/*.json`) are the security
+  boundary. Grant the minimum permission set the feature needs; prefer
+  `core:webview:allow-<specific>` over `core:webview:default` once we know
+  what we use.
+- Default-deny on outbound navigation. `navigation::decide` already
+  enforces the whitelist (§16); never add a blanket `Allow` path.
+- HTTPS-only URLs are validated in `config.rs` — keep it that way.
+- Frontend input is untrusted. Validate again in Rust for anything that
+  hits disk, IPC, or navigation policy.
+- No `eval`, `new Function()`, or dynamically injected `<script>` in the
+  frontend bundle. No third-party CDN imports either.
+- CSP stays restrictive. Currently `null` for dev; tighten (or set
+  `strict-dynamic`) before any release build.
+- Secrets never appear in the frontend bundle, IPC payloads, or persisted
+  state. `app.state.json` is intentionally tiny.
+- No `tokio::spawn` without a bounded channel / cancellation path.
+
+## Refactoring
+
+A refactor that touches a name, type, or shape must update **every** place
+that depends on it. Use this checklist before opening the PR:
+
+| Change | Must update |
+|---|---|
+| Rename a Rust function / type / module | `lib.rs` `mod` + `pub use`, every `use` site, tests, `// §X.Y` comments that name it, this file's Module map |
+| Rename a Tauri command string | Rust handler in `commands.rs` (or its module), `lib.rs` `generate_handler!` list, every `src/ipc/*.ts` wrapper, every caller in `src/` |
+| Change an IPC type signature (Rust struct fields, `Bounds`, etc.) | Rust struct + `#[derive]` set, `src/types.ts` mirror, every `src/ipc/*.ts` wrapper that types its parameters, tests |
+| Add / remove / rename a config field | `config/app.config.default.json`, `schemas/app.config.schema.json`, Rust struct (`config.rs`), `src/types.ts`, `src/config/normalize.ts` if a default or invariant changes |
+| Rename a TS function / type / component | the file itself, every `import` site, any `defineProps` / `defineEmits` referencing it, the Module map in this file |
+| Move a file (Rust) | `mod xxx;` in `lib.rs` (or parent), every `use` site, this file's Module map |
+| Move a file (TS) | every `import` site; check `tsconfig.json` paths if it crosses `src/` subtrees |
+| Rename a design-doc section number | `// §X.Y` comments that referenced the old number; the Module map if it cites a section |
+| Add a new Tauri command | `commands.rs` (or its module), `lib.rs` handler list, `src/ipc/*.ts` wrapper, TS type in `src/types.ts` |
+| Add a new module | `pub mod` in `lib.rs`, the Module map in this file, the `Layout` block |
+| Delete a feature | tests, design-doc `// §X.Y` comments, `app.config.default.json`, `schemas/app.config.schema.json`, the Phase status list |
+
+Always end a refactor commit with `cargo check` + `cargo test` from
+`src-tauri/` and `bun run build` from the repo root. Both must succeed
+before the change is considered complete.
+
 ## Do
 
 - Match design doc section numbers in comments when implementing a feature
