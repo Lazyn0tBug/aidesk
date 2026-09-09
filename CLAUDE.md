@@ -72,7 +72,7 @@ Rust (`src-tauri/src/`):
 | `config.rs` | load default + user config, deep merge, validate, expose `AppConfig` | §13.2, §6 |
 | `state.rs` | read/write `app.state.json`, `lastActiveProviderId` | §13.3, §9 |
 | `providers.rs` | filter enabled, lookup, whitelist computation | §13.4, §16 |
-| `webview_manager.rs` | per-provider WebView lifecycle; creates child `WebviewWindow`s via `WebviewWindowBuilder::parent("main")`, gates navigation through `on_navigation` whitelist | §13.5, §4.3, §4.6 |
+| `webview_manager.rs` | per-provider WebView lifecycle; creates child `WebviewWindow`s via `WebviewWindowBuilder::parent("main")`; `on_navigation` hook consults `navigation::decide` and, for `OpenExternal`, spawns `tauri-plugin-opener` to hand the URL to the system browser | §13.5, §4.3, §4.6 |
 | `navigation.rs` | navigation whitelist check + external browser | §13.6, §4.6 |
 | `clipboard.rs` | write-only clipboard service via `arboard`; never reads | §13.7, §4.5 |
 | `commands.rs` | Tauri command handlers + unified error format | §13.8, §12, §17 |
@@ -288,7 +288,7 @@ before the change is considered complete.
 - [x] Phase 1: Config system (this scaffold)
 - [x] Phase 2: Tab + WebView lifecycle
 - [x] Phase 3: DraftBox + clipboard
-- [ ] Phase 4: State + error overlay + retry
+- [x] Phase 4: State + error overlay + retry
 - [ ] Phase 5: Acceptance
 
 Each phase ships behind a single commit and verifies against the matching
@@ -330,3 +330,35 @@ Each phase ships behind a single commit and verifies against the matching
 - DraftBox Enter (§15.3) copies + calls `switchProvider(active_id, bounds)`.
   The switch is effectively a no-op when already on the active tab
   but it re-asserts bounds and gives Phase 4 a hook for webview focus.
+
+### Phase 4 notes
+
+- `app.state.json` is fully implemented (§9): atomic temp+rename write,
+  ISO 8601 `updatedAt`, reset-to-empty on parse error, dir creation
+  on first write. The `WebviewManager` snapshot for tests exposes
+  the lifecycle map without exposing the underlying `Mutex`.
+- Last-active restore is in `resolveActiveProvider` (`stores/appStore.ts`).
+  Per §4.7 #6/#7: respects `app.window.rememberLastProvider`, and
+  falls back to `defaultProvider.active` then first-enabled when the
+  stored id is missing/disabled.
+- Loading + error overlays come from `StatusOverlay.vue` keyed off
+  `state.webviews[id].{loading,error}`. The overlay sits inside the
+  WebViewArea so it overlays whatever the Rust webview is showing
+  (which is hidden behind it when `hidden` via the bounds observer).
+- Retry flow (§15.5): `StatusOverlay` emits `reload` →
+  `App.onReload` → `reloadActive(id)` → `reload_provider_webview`
+  Tauri command → on success `markProviderReady`, on failure
+  `markProviderError` (so the overlay reappears).
+- **System-browser fallback** (§4.6 #5): the `on_navigation` hook now
+  calls `navigation::decide` for each navigation attempt:
+    - `Allow` -> navigation proceeds.
+    - `Block` -> navigation blocked in-webview.
+    - `OpenExternal` -> in-webview navigation blocked AND
+      `tauri::async_runtime::spawn` calls
+      `app.opener().open_url(url, None::<&str>)` (the plugin we
+      already had for §3.2 flexibility). The opener call is
+      fire-and-forget; failures log but don't surface to the UI
+      (an off-whitelist misclick is rare and recoverable via
+      clipboard).
+  Gated on `security.openExternalInSystemBrowser`; when false, the
+  decision collapses to plain block.

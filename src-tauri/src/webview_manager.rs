@@ -21,6 +21,7 @@ use tauri::{
 
 use crate::config::{AppConfig, ProviderId};
 use crate::error::{AppError, AppResult};
+use crate::navigation;
 use crate::providers;
 
 /// Wire type matching design §12.6 (`Bounds`).
@@ -126,17 +127,38 @@ pub async fn create_provider_webview<R: Runtime>(
     );
 
     let label = webview_label(&provider_id);
-    let allowed_hosts = providers::provider_allowed_hosts(&cfg, provider);
+    let open_external = cfg.security.open_external_in_system_browser;
+    let provider_for_decide = provider.clone();
+    let cfg_for_decide = cfg.clone();
+    let app_for_decide = app.clone();
 
     let parent_window = get_webview_window(&app, main_window_label())?;
     let child = WebviewWindowBuilder::new(&app, &label, url)
         .parent(&parent_window)
         .map_err(|e| AppError::WebviewCreateFailed(format!("set parent: {e}")))?
         .on_navigation(move |nav_url: &url::Url| {
-            nav_url
-                .host_str()
-                .map(|host| providers::is_host_allowed(&allowed_hosts, host))
-                .unwrap_or(false)
+            let decision = navigation::decide(&cfg_for_decide, &provider_for_decide, nav_url.as_str());
+            match decision {
+                Ok(navigation::NavigationDecision::Allow) => true,
+                Ok(navigation::NavigationDecision::Block) => false,
+                Ok(navigation::NavigationDecision::OpenExternal) => {
+                    if open_external {
+                        // Spawn an external-browser open from the
+                        // navigation hook. The hook itself returns
+                        // false so the in-webview navigation is blocked.
+                        let app = app_for_decide.clone();
+                        let url = nav_url.to_string();
+                        tauri::async_runtime::spawn(async move {
+                            use tauri_plugin_opener::OpenerExt;
+                            if let Err(e) = app.opener().open_url(url, None::<&str>) {
+                                eprintln!("[aidesk] open_url failed: {e}");
+                            }
+                        });
+                    }
+                    false
+                }
+                Err(_) => false,
+            }
         })
         .build()
         .map_err(|e| AppError::WebviewCreateFailed(format!("build: {e}")))?;
