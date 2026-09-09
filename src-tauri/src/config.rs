@@ -473,10 +473,14 @@ pub fn validate(value: &Value) -> AppResult<()> {
     }
 
     // maxActiveWebviews range check.
+    // `Value::as_u64` returns None for negative numbers, which would
+    // silently skip the range check and let -1 through (only to fail
+    // downstream during deserialization). Use `as_i64` and check the
+    // sign explicitly so the error is reported at the validation layer.
     if let Some(max) = value
         .get("webview")
         .and_then(|w| w.get("maxActiveWebviews"))
-        .and_then(Value::as_u64)
+        .and_then(Value::as_i64)
     {
         if !(1..=10).contains(&max) {
             return Err(AppError::ConfigValidationFailed(format!(
@@ -490,7 +494,7 @@ pub fn validate(value: &Value) -> AppResult<()> {
         .get("ui")
         .and_then(|u| u.get("toast"))
         .and_then(|t| t.get("durationMs"))
-        .and_then(Value::as_u64)
+        .and_then(Value::as_i64)
     {
         if !(1000..=10000).contains(&d) {
             return Err(AppError::ConfigValidationFailed(format!(
@@ -655,6 +659,21 @@ mod tests {
                 {"id": "x", "name": "X", "iconKey": "x", "url": "https://x/", "enabled": true},
             ],
             "webview": {"maxActiveWebviews": 99, "lazyLoad": true, "keepAlive": true},
+        });
+        assert!(validate(&v).is_err());
+    }
+
+    #[test]
+    fn validate_rejects_negative_max_webviews() {
+        // Previously as_u64 returned None for negatives and the check
+        // was silently skipped; the deserialization layer then failed
+        // with a confusing u32 cast error. The validator must catch
+        // negative values explicitly.
+        let v = serde_json::json!({
+            "providers": [
+                {"id": "x", "name": "X", "iconKey": "x", "url": "https://x/", "enabled": true},
+            ],
+            "webview": {"maxActiveWebviews": -1, "lazyLoad": true, "keepAlive": true},
         });
         assert!(validate(&v).is_err());
     }

@@ -31,22 +31,4 @@ test.describe("AIDesk boot", () => {
     const placeholder = await textarea.getAttribute("placeholder");
     expect(placeholder?.length ?? 0).toBeGreaterThan(0);
   });
-
-  test("status overlay shows when the active webview is loading", async ({ page }) => {
-    // Mark the active webview as loading in the store, then assert
-    // the overlay renders. We do this via a custom JS handle rather
-    // than waiting for the Rust webview to actually fetch — the test
-    // is about the UI surface, not network reachability.
-    await page.goto("/");
-    await page.evaluate(() => {
-      // Walk the Vue tree to find the store-bound webviews map.
-      // The store exposes its state via window for testing.
-      // (window as unknown as { __aidesk_store?: { webviews: Record<string, { loading: boolean }> } })
-      //   .__aidesk_store?.webviews?.qwen && (window as any).__aidesk_store.webviews.qwen.loading = true;
-    });
-    // We can't drive the store from outside without an explicit hook,
-    // so the assertion below verifies the static structure rather than
-    // the dynamic transition.
-    await expect(page.locator("main").first()).toBeVisible();
-  });
 });

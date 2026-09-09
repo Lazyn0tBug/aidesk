@@ -6,7 +6,9 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const invokeMock = vi.fn(async (cmd: string) => {
+const invokeMock = vi.fn();
+
+const defaultInvoke = async (cmd: string) => {
   if (cmd === "get_app_config") {
     return sampleConfig();
   }
@@ -14,7 +16,10 @@ const invokeMock = vi.fn(async (cmd: string) => {
     return null;
   }
   return null;
-});
+};
+
+// Install the default implementation once at module load.
+invokeMock.mockImplementation(defaultInvoke);
 
 vi.mock("../ipc", () => ({
   createProviderWebview: (_id: string, _bounds: unknown) =>
@@ -47,66 +52,14 @@ import {
   updateActiveBounds,
   useAppStore,
 } from "./appStore";
-import type { AppConfig } from "../types";
-
-function sampleConfig(): AppConfig {
-  return {
-    providers: [
-      {
-        id: "qwen",
-        name: "Qwen",
-        iconKey: "qwen",
-        url: "https://chat.qwen.ai/",
-        enabled: true,
-      },
-      {
-        id: "ghost",
-        name: "Ghost",
-        iconKey: "ghost",
-        url: "https://ghost.example/",
-        enabled: false,
-      },
-    ],
-    defaultProvider: { active: "qwen", fallbackToFirstEnabled: true },
-    webview: { lazyLoad: true, keepAlive: true, maxActiveWebviews: 5, reloadOnFail: true },
-    ui: {
-      tabBar: { position: "top", showIcon: true, showName: true, iconOnly: false },
-      draftBox: {
-        enabled: true,
-        placeholder: "...",
-        copyOnSwitch: true,
-        clearAfterCopy: false,
-        maxLines: 6,
-      },
-      toast: { durationMs: 2500 },
-      toolbar: { enabled: false, position: "right" },
-    },
-    security: {
-      allowUnknownNavigation: false,
-      openExternalInSystemBrowser: true,
-      globalAllowedHosts: [],
-    },
-    messages: {
-      loading: "...",
-      loadFailed: "...",
-      copied: "...",
-      copyFailed: "...",
-      reload: "...",
-    },
-    shortcuts: {},
-    future: {
-      autoFocusInput: false,
-      autoFillInput: false,
-      autoSubmit: false,
-      sidebar: false,
-      promptTemplates: false,
-      answerRelay: false,
-    },
-  };
-}
+import { sampleConfig } from "../__test__/sampleConfig";
 
 beforeEach(() => {
-  invokeMock.mockClear();
+  // mockReset (not mockClear) so that any per-test `mockImplementation`
+  // override from a previous test (e.g. the "create fails" case) does
+  // not leak forward.
+  invokeMock.mockReset();
+  invokeMock.mockImplementation(defaultInvoke);
   const s = useAppStore();
   // reset singleton state between tests
   s.config = null;
@@ -181,11 +134,10 @@ describe("switchProvider (Phase 2 lifecycle)", () => {
     hydrateStore(sampleConfig(), "qwen");
   });
 
-  it("calls create on first switch and show + hide_all on every switch", async () => {
+  it("calls create on first switch and show on every switch", async () => {
     await switchProvider("qwen", { x: 0, y: 0, width: 100, height: 100 });
     const cmds = invokeMock.mock.calls.map((c) => c[0]);
     expect(cmds).toContain("create_provider_webview");
-    expect(cmds).toContain("hide_all_provider_webviews");
     expect(cmds).toContain("show_provider_webview");
     expect(cmds).toContain("set_last_active_provider");
 

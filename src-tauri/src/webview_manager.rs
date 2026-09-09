@@ -388,12 +388,14 @@ mod tests {
     #[test]
     fn webview_label_includes_provider_id_only() {
         // Sanity check: only alphanumeric + dash/underscore, which is
-        // what Tauri's label validation accepts.
-        let label = webview_label("chatgpt");
+        // what Tauri's label validation accepts and matches the
+        // config.rs regex `^[a-z0-9][a-z0-9-_]{1,63}$` that permits
+        // `_` from position 1 onwards.
+        let label = webview_label("foo_bar");
         assert!(label.starts_with("provider-"));
         assert!(label
             .chars()
-            .all(|c| c.is_alphanumeric() || c == '-'));
+            .all(|c| c.is_alphanumeric() || c == '-' || c == '_'));
     }
 
     #[test]

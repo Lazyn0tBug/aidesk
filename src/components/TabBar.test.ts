@@ -22,36 +22,7 @@ vi.mock("../ipc", () => ({
 
 import TabBar from "./TabBar.vue";
 import { hydrateStore, useAppStore } from "../stores/appStore";
-import type { AppConfig } from "../types";
-
-function sample(): AppConfig {
-  return {
-    providers: [
-      { id: "qwen", name: "Qwen", iconKey: "qwen", url: "https://chat.qwen.ai/", enabled: true },
-    ],
-    defaultProvider: { fallbackToFirstEnabled: true },
-    webview: { lazyLoad: true, keepAlive: true, maxActiveWebviews: 5, reloadOnFail: true },
-    ui: {
-      tabBar: { position: "top", showIcon: true, showName: true, iconOnly: false },
-      draftBox: {
-        enabled: true,
-        placeholder: "",
-        copyOnSwitch: true,
-        clearAfterCopy: false,
-        maxLines: 6,
-      },
-      toast: { durationMs: 2500 },
-      toolbar: { enabled: false, position: "right" },
-    },
-    security: { allowUnknownNavigation: false, openExternalInSystemBrowser: true, globalAllowedHosts: [] },
-    messages: { loading: "", loadFailed: "", copied: "", copyFailed: "", reload: "" },
-    shortcuts: {},
-    future: {
-      autoFocusInput: false, autoFillInput: false, autoSubmit: false,
-      sidebar: false, promptTemplates: false, answerRelay: false,
-    },
-  };
-}
+import { sampleConfig } from "../__test__/sampleConfig";
 
 beforeEach(() => {
   const s = useAppStore();
@@ -65,7 +36,7 @@ beforeEach(() => {
 
 describe("TabBar.vue", () => {
   it("renders one tab per enabled provider", () => {
-    hydrateStore(sample(), null);
+    hydrateStore(sampleConfig(), null);
     const wrapper = mount(TabBar, {
       props: { config: useAppStore().config!.ui.tabBar },
     });
@@ -75,7 +46,7 @@ describe("TabBar.vue", () => {
   });
 
   it("marks the active provider with aria-selected=true", () => {
-    hydrateStore(sample(), "qwen");
+    hydrateStore(sampleConfig(), "qwen");
     const wrapper = mount(TabBar, {
       props: { config: useAppStore().config!.ui.tabBar },
     });
@@ -84,7 +55,7 @@ describe("TabBar.vue", () => {
   });
 
   it("emits select with the clicked provider id", async () => {
-    hydrateStore(sample(), "qwen");
+    hydrateStore(sampleConfig(), "qwen");
     const wrapper = mount(TabBar, {
       props: { config: useAppStore().config!.ui.tabBar },
     });
@@ -93,7 +64,7 @@ describe("TabBar.vue", () => {
   });
 
   it("applies the loading class to webviews in loading state", () => {
-    hydrateStore(sample(), "qwen");
+    hydrateStore(sampleConfig(), "qwen");
     const wv = useAppStore().webviews["qwen"]!;
     wv.loading = true;
     const wrapper = mount(TabBar, {

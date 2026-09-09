@@ -18,7 +18,6 @@ import type {
 import { normalizeAppConfig } from "../config/normalize";
 import {
   createProviderWebview,
-  hideAllProviderWebviews,
   reloadProviderWebview,
   setLastActiveProvider,
   setProviderWebviewBounds,
@@ -156,8 +155,13 @@ function setVisibleFlag(id: ProviderId | null) {
 /**
  * Synchronous state setter for the active provider. Used by
  * `switchProvider` (which adds IPC on top) and by tests.
+ *
+ * No-ops if `id` is not in `state.webviews` (i.e. unknown or
+ * disabled provider) so callers can't desync Vue state from the
+ * Rust webview map by passing an unvalidated id.
  */
 export function setActiveProvider(id: ProviderId) {
+  if (!state.webviews[id]) return;
   if (state.activeProviderId === id) return;
   state.activeProviderId = id;
   setVisibleFlag(id);
@@ -175,7 +179,6 @@ export function setActiveProvider(id: ProviderId) {
  */
 export async function switchProvider(id: ProviderId, bounds: Bounds): Promise<void> {
   if (!state.config) return;
-  const prev = state.activeProviderId;
 
   setActiveProvider(id);
   setLastActiveProvider(id).catch(() => {});
@@ -189,18 +192,15 @@ export async function switchProvider(id: ProviderId, bounds: Bounds): Promise<vo
       await createProviderWebview(id, bounds);
       wv.created = true;
     }
-    await hideAllProviderWebviews();
+    // show_provider_webview hides the previously-visible provider in
+    // the same Rust call (webview_manager.rs::show_provider_webview),
+    // so no separate hide_all round-trip is needed.
     await showProviderWebview(id, bounds);
     markProviderReady(id);
   } catch (err) {
     console.error(`[aidesk] switchProvider(${id}) failed`, err);
     markProviderError(id);
   }
-
-  // Touch `prev` so the compiler keeps the variable (used to be checked
-  // for early-return optimization; left in place for future "skip
-  // re-show when switching to the same id" logic).
-  void prev;
 }
 
 /** Update only the bounds of the currently-visible webview (design §15.4). */
