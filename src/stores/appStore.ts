@@ -3,15 +3,27 @@
 // Module-scope reactive state plus a composable. We avoid Pinia to keep
 // the dependency surface minimal; the store has only one shape and one
 // owner (the App root) so a singleton `reactive()` is appropriate.
+//
+// Phase 2: stores IPC actions alongside state so components only call
+// `store.switchProvider(id)` etc. — IPC details stay inside the store.
 
 import { computed, reactive } from "vue";
 import type {
   AppConfig,
+  Bounds,
   ProviderConfig,
   ProviderId,
   WebViewRuntimeState,
 } from "../types";
 import { normalizeAppConfig } from "../config/normalize";
+import {
+  createProviderWebview,
+  hideAllProviderWebviews,
+  reloadProviderWebview,
+  setLastActiveProvider,
+  setProviderWebviewBounds,
+  showProviderWebview,
+} from "../ipc";
 
 interface StoreState {
   config: AppConfig | null;
@@ -45,13 +57,16 @@ export const activeWebview = computed<WebViewRuntimeState | null>(() => {
   return state.webviews[state.activeProviderId] ?? null;
 });
 
+// -----------------------------------------------------------------------------
+// Hydration (called once on app start, §15.1)
+// -----------------------------------------------------------------------------
+
 /** Hydrate the store from Rust. Called once on app start. */
 export function hydrateStore(config: AppConfig, lastActiveProviderId: ProviderId | null) {
   const normalized = normalizeAppConfig(config);
   state.config = normalized;
   state.enabledProviders = normalized.providers.filter((p) => p.enabled);
 
-  // Reset webview runtime state for the enabled set.
   state.webviews = {};
   for (const p of state.enabledProviders) {
     state.webviews[p.id] = {
@@ -63,7 +78,6 @@ export function hydrateStore(config: AppConfig, lastActiveProviderId: ProviderId
     };
   }
 
-  // Resolve active provider per design §4.7.
   state.activeProviderId = resolveActiveProvider(normalized, lastActiveProviderId);
   state.ready = true;
 }
@@ -103,16 +117,9 @@ export function resolveActiveProvider(
   return null;
 }
 
-export function setActiveProvider(id: ProviderId) {
-  if (state.activeProviderId === id) return;
-  state.activeProviderId = id;
-  // Mark only this provider as visible. Phase 2 will call show/hide
-  // commands; here we just track intent.
-  for (const pid of Object.keys(state.webviews)) {
-    const wv = state.webviews[pid];
-    wv.visible = pid === id;
-  }
-}
+// -----------------------------------------------------------------------------
+// State mutators (pure local state changes)
+// -----------------------------------------------------------------------------
 
 export function setDraft(value: string) {
   state.draft = value;
@@ -138,4 +145,83 @@ export function markProviderError(id: ProviderId) {
   if (!wv) return;
   wv.loading = false;
   wv.error = true;
+}
+
+function setVisibleFlag(id: ProviderId | null) {
+  for (const pid of Object.keys(state.webviews)) {
+    state.webviews[pid].visible = pid === id;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Actions (call IPC; orchestrate Phase 2 lifecycle, §15.2)
+// -----------------------------------------------------------------------------
+
+/**
+ * Lazy-create the webview for `id` and show it. Per design §4.3 #2 the
+ * first click is what triggers creation; subsequent switches just show.
+ *
+ * Returns silently on success. Errors land on `state.webviews[id].error`.
+ */
+export async function switchProvider(id: ProviderId, bounds: Bounds): Promise<void> {
+  if (!state.config) return;
+  const prev = state.activeProviderId;
+
+  setActiveProviderLocal(id);
+  setLastActiveProvider(id).catch(() => {});
+
+  const wv = state.webviews[id];
+  if (!wv) return;
+
+  try {
+    if (!wv.created) {
+      markProviderLoading(id);
+      await createProviderWebview(id, bounds);
+      wv.created = true;
+    }
+    await hideAllProviderWebviews();
+    await showProviderWebview(id, bounds);
+    markProviderReady(id);
+  } catch (err) {
+    console.error(`[aidesk] switchProvider(${id}) failed`, err);
+    markProviderError(id);
+  }
+
+  // Touch `prev` so the compiler keeps the variable (used to be checked
+  // for early-return optimization; left in place for future "skip
+  // re-show when switching to the same id" logic).
+  void prev;
+}
+
+/** Update only the bounds of the currently-visible webview (design §15.4). */
+export async function updateActiveBounds(bounds: Bounds): Promise<void> {
+  const id = state.activeProviderId;
+  if (!id) return;
+  const wv = state.webviews[id];
+  if (!wv?.created) return;
+  try {
+    await setProviderWebviewBounds(id, bounds);
+  } catch (err) {
+    console.error(`[aidesk] updateActiveBounds failed`, err);
+  }
+}
+
+/** Reload a provider's webview (design §15.5). */
+export async function reloadActive(id: ProviderId): Promise<void> {
+  markProviderLoading(id);
+  try {
+    await reloadProviderWebview(id);
+    markProviderReady(id);
+  } catch (err) {
+    console.error(`[aidesk] reloadProvider(${id}) failed`, err);
+    markProviderError(id);
+  }
+}
+
+// Local setter used by switchProvider before the webview is up. Kept
+// private to avoid components calling it directly.
+function setActiveProviderLocal(id: ProviderId) {
+  if (state.activeProviderId === id) return;
+  state.activeProviderId = id;
+  setVisibleFlag(id);
 }

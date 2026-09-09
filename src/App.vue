@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // App root — orchestrates TabBar, DraftBox, WebViewArea, Toast.
-// Implements the startup flow from design §15.1.
+// Implements the startup flow from design §15.1, switching §15.2,
+// enter §15.3, and resize §15.4.
 
 import { computed, onMounted, ref } from "vue";
 import TabBar from "./components/TabBar.vue";
@@ -10,21 +11,24 @@ import Toast from "./components/Toast.vue";
 import {
   activeProvider,
   hydrateStore,
-  markProviderError,
-  markProviderLoading,
-  markProviderReady,
-  setActiveProvider,
+  reloadActive,
+  switchProvider,
+  updateActiveBounds,
   useAppStore,
 } from "./stores/appStore";
 import { bindToastConfig, pushToast } from "./utils/toast";
 import { getAppConfig, getLastActiveProvider } from "./ipc";
-import { setLastActiveProvider } from "./ipc/state";
 import { copyText } from "./ipc/clipboard";
 import type { Bounds, ProviderId } from "./types";
 
 const store = useAppStore();
 const ready = ref(false);
 const loadError = ref<string | null>(null);
+
+// Last computed bounds for the WebViewArea; used both to drive
+// `set_provider_webview_bounds` on resize and to supply the initial
+// bounds when the user clicks a tab.
+const lastBounds = ref<Bounds | null>(null);
 
 onMounted(async () => {
   try {
@@ -35,12 +39,10 @@ onMounted(async () => {
     hydrateStore(config, lastActive);
     if (store.config?.ui.toast) bindToastConfig(store.config.ui.toast);
 
-    if (store.activeProviderId) {
-      markProviderLoading(store.activeProviderId);
-      window.setTimeout(() => {
-        if (store.activeProviderId) markProviderReady(store.activeProviderId);
-      }, 800);
-    }
+    // WebViewArea will emit bounds shortly after mount; when it does,
+    // create + show the active provider (design §15.1 steps 12-13).
+    // If no resize event fires (unlikely), the user can click any tab
+    // to force creation.
   } catch (err) {
     loadError.value = (err as { message?: string })?.message ?? String(err);
   } finally {
@@ -60,14 +62,24 @@ const messages = computed(() => {
   );
 });
 
+function boundsForSwitch(): Bounds {
+  // Use the last measured bounds if available; fall back to a full-window
+  // rectangle sized to the current window so the first show still has
+  // something sensible.
+  if (lastBounds.value) return lastBounds.value;
+  return {
+    x: 0,
+    y: 0,
+    width: window.innerWidth,
+    height: window.innerHeight,
+  };
+}
+
 async function onSelectTab(id: ProviderId) {
   if (!store.config) return;
   const prev = store.activeProviderId;
-  setActiveProvider(id);
-  await setLastActiveProvider(id).catch(() => {});
+  await switchProvider(id, boundsForSwitch());
   if (prev === id) return;
-  markProviderLoading(id);
-  window.setTimeout(() => markProviderReady(id), 400);
 
   if (
     store.config.ui.draftBox.copyOnSwitch &&
@@ -97,14 +109,23 @@ function onSubmitDraft() {
   void performCopyAndMaybeClear();
 }
 
-function onReload(id: string) {
-  markProviderLoading(id);
-  window.setTimeout(() => markProviderError(id), 600);
+async function onReload(id: string) {
+  await reloadActive(id);
 }
 
-const lastBounds = ref<Bounds | null>(null);
-function onBounds(b: Bounds) {
+async function onBounds(b: Bounds) {
   lastBounds.value = b;
+
+  // First-time case: when bounds first arrive, eagerly create + show
+  // the active provider (design §15.1 step 13). Subsequent emissions
+  // only need to update the active webview's bounds.
+  const id = store.activeProviderId;
+  if (id && store.webviews[id] && !store.webviews[id].created) {
+    await switchProvider(id, b);
+    return;
+  }
+
+  await updateActiveBounds(b);
 }
 </script>
 

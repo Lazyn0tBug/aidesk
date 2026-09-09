@@ -72,7 +72,7 @@ Rust (`src-tauri/src/`):
 | `config.rs` | load default + user config, deep merge, validate, expose `AppConfig` | §13.2, §6 |
 | `state.rs` | read/write `app.state.json`, `lastActiveProviderId` | §13.3, §9 |
 | `providers.rs` | filter enabled, lookup, whitelist computation | §13.4, §16 |
-| `webview_manager.rs` | per-provider WebView lifecycle (Phase 2 stub) | §13.5, §4.3 |
+| `webview_manager.rs` | per-provider WebView lifecycle; creates child `WebviewWindow`s via `WebviewWindowBuilder::parent("main")`, gates navigation through `on_navigation` whitelist | §13.5, §4.3, §4.6 |
 | `navigation.rs` | navigation whitelist check + external browser | §13.6, §4.6 |
 | `clipboard.rs` | write system clipboard (Phase 3 stub) | §13.7, §4.5 |
 | `commands.rs` | Tauri command handlers + unified error format | §13.8, §12, §17 |
@@ -82,7 +82,7 @@ Frontend (`src/`):
 | File | Responsibility | Design ref |
 |---|---|---|
 | `App.vue` | layout root, mounts TabBar + DraftBox + WebViewArea + Toast | §3.2, §5, §15 |
-| `stores/appStore.ts` | reactive store: config, providers, active, draft, webviews | §14.2, §11.1 |
+| `stores/appStore.ts` | reactive store + actions: `hydrateStore`, `switchProvider`, `updateActiveBounds`, `reloadActive` (Phase 2 lifecycle, §15) | §14.2, §11.1 |
 | `ipc/*` | typed `invoke()` wrappers | §12 |
 | `utils/bounds.ts` | `calculateWebViewBounds()` | §14.3, §5.3 |
 | `utils/icons.ts` | `resolveIcon(iconKey)` | §14.4 |
@@ -286,10 +286,30 @@ before the change is considered complete.
 ## Phase status
 
 - [x] Phase 1: Config system (this scaffold)
-- [ ] Phase 2: Tab + WebView lifecycle
+- [x] Phase 2: Tab + WebView lifecycle
 - [ ] Phase 3: DraftBox + clipboard
 - [ ] Phase 4: State + error overlay + retry
 - [ ] Phase 5: Acceptance
 
 Each phase ships behind a single commit and verifies against the matching
 §21 acceptance list before moving on.
+
+### Phase 2 notes
+
+- Provider webviews are mounted as **child windows of the main window**
+  via `WebviewWindowBuilder::parent(main_window)`. This is the supported
+  (non-`unstable`) path in Tauri v2. `tauri::WebviewBuilder` is the
+  alternative but lives behind the `unstable` feature flag, which we
+  avoid.
+- Navigation whitelist (design §4.6) is enforced at the `on_navigation`
+  hook installed at creation time, not on the frontend. Off-whitelist
+  URLs are blocked. Phase 4 may add a fallback that opens the URL in
+  the system browser when `security.openExternalInSystemBrowser` is
+  true; for now block-only matches §4.6 #6 when that flag is false.
+- The frontend lazily creates webviews on first switch (design §4.3
+  #2). The active provider is created eagerly on startup once
+  `WebViewArea` emits its first bounds.
+- "At most one visible WebView" (design §3.1 #4, §4.3 #6) is enforced
+  inside `show_provider_webview`: it hides the previously-visible
+  provider in the same call rather than requiring a separate
+  `hide_all` round-trip.

@@ -39,6 +39,7 @@ const onClick = (id: ProviderId) => {
     class="flex flex-none h-11 px-2 gap-1 items-stretch border-b border-line bg-surface-2"
     role="tablist"
     aria-label="Provider tabs"
+    data-tabbar
   >
     <button
       v-for="tab in tabs"

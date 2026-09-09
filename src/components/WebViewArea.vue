@@ -1,11 +1,11 @@
 <script setup lang="ts">
 // §3.4 / §5 WebViewArea.
 //
-// Phase 1 scaffold: renders a status card with the active provider's URL
-// so the layout is verifiable without a Tauri runtime. Phase 2 will
-// replace the placeholder body with a Tauri WebviewWindow embedded at
-// the computed bounds; status (loading/error) will be driven by the
-// Rust commands in `src/ipc/webview.ts`.
+// Phase 2: hosts the active provider's WebViewWindow (managed by Rust).
+// The Rust side creates a child window per provider and we measure the
+// available rectangle here so the parent can place it correctly. We do
+// not render any iframe or webview DOM directly — the actual content is
+// a native window from `WebviewWindowBuilder::parent("main")`.
 
 import { computed, onMounted, onUnmounted } from "vue";
 import { activeWebview } from "../stores/appStore";
@@ -36,8 +36,8 @@ const overlayState = computed<"loading" | "error" | null>(() => {
 
 let resizeObserver: ResizeObserver | null = null;
 const onResize = () => {
-  const tabBar = document.querySelector<HTMLElement>(".tab-bar") ?? document.querySelector("header");
-  const draftBox = document.querySelector<HTMLElement>(".draft-box") ?? document.querySelector("section");
+  const tabBar = document.querySelector<HTMLElement>("[data-tabbar]");
+  const draftBox = document.querySelector<HTMLElement>("[data-draftbox]");
   const bounds = calculateWebViewBounds({
     windowWidth: window.innerWidth,
     windowHeight: window.innerHeight,
@@ -51,6 +51,8 @@ onMounted(() => {
   window.addEventListener("resize", onResize);
   resizeObserver = new ResizeObserver(onResize);
   resizeObserver.observe(document.body);
+  // Force one emission so the parent gets the initial bounds even if
+  // ResizeObserver's first tick is delayed.
   onResize();
 });
 
@@ -81,7 +83,7 @@ onUnmounted(() => {
           />
           <h2 class="m-0 text-lg">{{ provider.name }}</h2>
           <p class="m-0 text-ink-2 text-[13px] break-all">{{ provider.url }}</p>
-          <p class="mt-1 mb-0 text-ink-2 text-[11px]">Phase 2: this surface will host a Tauri WebviewWindow.</p>
+          <p class="mt-1 mb-0 text-ink-2 text-[11px]">Provider window active — content renders in a child of the main window.</p>
         </div>
       </div>
     </template>

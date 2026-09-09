@@ -1,26 +1,29 @@
 //! WebView lifecycle manager (design §13.5).
 //!
-//! Phase 2 deliverable. The current stub defines the public surface and
-//! runtime state types so `commands.rs` can wire Tauri commands; bodies
-//! return `AppError::Webview*` until implementation lands.
+//! Phase 2: real Tauri v2 webview management. Each enabled provider gets
+//! one child window of the main window via `WebviewWindowBuilder::parent`,
+//! which is the supported (non-`unstable`) way to mount webviews inside
+//! the main shell in Tauri v2. Navigation is gated by an `on_navigation`
+//! hook that consults the per-provider whitelist from
+//! `providers::provider_allowed_hosts` (design §4.6, §16).
+//!
+//! Concurrency: a single `Mutex<WebviewState>` guards the in-memory map.
+//! Locks are held only long enough to read or update an entry; no Tauri
+//! API call is made while holding the guard.
 
 use std::collections::HashMap;
 use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
-use tauri::AppHandle;
+use tauri::{
+    AppHandle, LogicalPosition, LogicalSize, Manager, Runtime, WebviewUrl, WebviewWindowBuilder,
+};
 
 use crate::config::{AppConfig, ProviderId};
 use crate::error::{AppError, AppResult};
+use crate::providers;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum WebviewLifecycle {
-    NotCreated,
-    Loading,
-    Ready,
-    Error,
-}
-
+/// Wire type matching design §12.6 (`Bounds`).
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Bounds {
     pub x: i32,
@@ -31,58 +34,189 @@ pub struct Bounds {
 
 #[derive(Debug, Default)]
 pub struct WebviewState {
-    pub lifecycle: HashMap<ProviderId, WebviewLifecycle>,
-    pub bounds: HashMap<ProviderId, Bounds>,
+    /// Maps `provider_id -> entry meta`. The actual `WebviewWindow<R>`
+    /// is accessed via `app.get_webview_window(&label)` rather than stored
+    /// here so the struct stays runtime-agnostic.
+    pub entries: HashMap<ProviderId, WebviewEntry>,
+    /// Currently visible provider, if any. At most one per design §3.1 #4.
     pub visible: Option<ProviderId>,
 }
 
-/// Shared Tauri-managed state wrapping the lifecycle map.
-#[derive(Default)]
-pub struct WebviewManager(pub Mutex<WebviewState>);
+#[derive(Debug, Clone)]
+pub struct WebviewEntry {
+    pub label: String,
+    pub bounds: Bounds,
+    pub visible: bool,
+}
+
+/// Managed Tauri state wrapping the lifecycle map plus the runtime
+/// `AppConfig` (so command handlers can resolve providers and compute
+/// per-provider whitelists without re-reading from disk).
+pub struct WebviewManager {
+    pub state: Mutex<WebviewState>,
+    pub config: AppConfig,
+}
 
 impl WebviewManager {
     pub fn from_config(config: &AppConfig) -> Self {
-        let mut state = WebviewState::default();
-        for p in &config.providers {
-            if p.enabled {
-                state.lifecycle.insert(p.id.clone(), WebviewLifecycle::NotCreated);
-            }
+        Self {
+            state: Mutex::new(WebviewState::default()),
+            config: config.clone(),
         }
-        Self(Mutex::new(state))
+    }
+
+    /// Convenience for tests / debug commands.
+    #[allow(dead_code)]
+    pub fn snapshot(&self) -> WebviewState {
+        self.state
+            .lock()
+            .map(|s| WebviewState {
+                entries: s.entries.clone(),
+                visible: s.visible.clone(),
+            })
+            .unwrap_or_default()
     }
 }
 
-/// Create the WebView for a provider (Phase 2).
-#[tauri::command]
-pub async fn create_provider_webview(
-    _app: AppHandle,
-    state: tauri::State<'_, WebviewManager>,
-    provider_id: ProviderId,
-    bounds: Bounds,
-) -> AppResult<()> {
-    let mut s = state.0.lock().map_err(|_| AppError::Internal("lock".into()))?;
-    s.bounds.insert(provider_id.clone(), bounds);
-    s.lifecycle.insert(provider_id, WebviewLifecycle::Loading);
-    Err(AppError::WebviewCreateFailed(
-        "Phase 2: not yet implemented".into(),
-    ))
+fn webview_label(provider_id: &str) -> String {
+    format!("provider-{provider_id}")
 }
 
-/// Show a previously created WebView.
+/// Look up a child webview window by label.
+fn get_webview_window<R: Runtime>(
+    app: &AppHandle<R>,
+    label: &str,
+) -> AppResult<tauri::WebviewWindow<R>> {
+    app.get_webview_window(label)
+        .ok_or_else(|| AppError::WebviewCreateFailed(format!("webview {label} not found")))
+}
+
+// -----------------------------------------------------------------------------
+// Tauri commands
+// -----------------------------------------------------------------------------
+
+/// Create the WebView for a provider (design §12.3, §4.3).
+///
+/// Idempotent in the strict sense: re-creating a provider that already has
+/// a webview is a no-op success. Per design §4.3 #2 ("首次点击 Provider 时
+/// 创建对应 WebView") the frontend only calls this once per provider; the
+/// defensive check guards against double-invocation during a tab race.
 #[tauri::command]
-pub async fn show_provider_webview(
-    _app: AppHandle,
+pub async fn create_provider_webview<R: Runtime>(
+    app: AppHandle<R>,
     state: tauri::State<'_, WebviewManager>,
     provider_id: ProviderId,
     bounds: Bounds,
 ) -> AppResult<()> {
-    let mut s = state.0.lock().map_err(|_| AppError::Internal("lock".into()))?;
-    s.bounds.insert(provider_id.clone(), bounds);
-    s.visible = Some(provider_id.clone());
-    s.lifecycle.insert(provider_id, WebviewLifecycle::Ready);
-    Err(AppError::WebviewShowFailed(
-        "Phase 2: not yet implemented".into(),
-    ))
+    let cfg = state.config.clone();
+    let provider = providers::find_enabled(&cfg, &provider_id)?;
+
+    {
+        let s = state.state.lock().map_err(|_| AppError::Internal(String::from("lock")))?;
+        if s.entries.contains_key(&provider_id) {
+            return Ok(());
+        }
+    }
+
+    let url = WebviewUrl::External(
+        provider
+            .url
+            .parse()
+            .map_err(|e| AppError::WebviewCreateFailed(format!("parse url: {e}")))?,
+    );
+
+    let label = webview_label(&provider_id);
+    let allowed_hosts = providers::provider_allowed_hosts(&cfg, provider);
+
+    let parent_window = get_webview_window(&app, main_window_label())?;
+    let child = WebviewWindowBuilder::new(&app, &label, url)
+        .parent(&parent_window)
+        .map_err(|e| AppError::WebviewCreateFailed(format!("set parent: {e}")))?
+        .on_navigation(move |nav_url: &url::Url| {
+            nav_url
+                .host_str()
+                .map(|host| providers::is_host_allowed(&allowed_hosts, host))
+                .unwrap_or(false)
+        })
+        .build()
+        .map_err(|e| AppError::WebviewCreateFailed(format!("build: {e}")))?;
+
+    child
+        .set_position(LogicalPosition::new(bounds.x as f64, bounds.y as f64))
+        .map_err(|e| AppError::WebviewBoundsFailed(format!("set_position: {e}")))?;
+    child
+        .set_size(LogicalSize::new(bounds.width as f64, bounds.height as f64))
+        .map_err(|e| AppError::WebviewBoundsFailed(format!("set_size: {e}")))?;
+
+    let mut s = state.state.lock().map_err(|_| AppError::Internal(String::from("lock")))?;
+    s.entries.insert(
+        provider_id.clone(),
+        WebviewEntry {
+            label,
+            bounds,
+            visible: false,
+        },
+    );
+    Ok(())
+}
+
+/// Show a previously created WebView (design §12.3).
+///
+/// Implementation detail: hides the previously visible provider in the same
+/// call so the invariant "at most one visible WebView" (design §3.1 #4,
+/// §4.3 #6) holds without a separate `hide_all` round-trip.
+#[tauri::command]
+pub async fn show_provider_webview<R: Runtime>(
+    app: AppHandle<R>,
+    state: tauri::State<'_, WebviewManager>,
+    provider_id: ProviderId,
+    bounds: Bounds,
+) -> AppResult<()> {
+    // Snapshot the entries we need while holding the lock.
+    let (label, to_hide) = {
+        let s = state.state.lock().map_err(|_| AppError::Internal(String::from("lock")))?;
+        let entry = s
+            .entries
+            .get(&provider_id)
+            .ok_or_else(|| AppError::ProviderNotFound(provider_id.clone()))?;
+        let label = entry.label.clone();
+        let to_hide = match &s.visible {
+            Some(prev) if prev != &provider_id => s.entries.get(prev).map(|e| e.label.clone()),
+            _ => None,
+        };
+        (label, to_hide)
+    };
+
+    if let Some(prev_label) = to_hide {
+        if let Ok(prev) = get_webview_window(&app, &prev_label) {
+            let _ = prev.hide();
+        }
+    }
+
+    let child = get_webview_window(&app, &label)?;
+
+    child
+        .set_position(LogicalPosition::new(bounds.x as f64, bounds.y as f64))
+        .map_err(|e| AppError::WebviewBoundsFailed(format!("set_position: {e}")))?;
+    child
+        .set_size(LogicalSize::new(bounds.width as f64, bounds.height as f64))
+        .map_err(|e| AppError::WebviewBoundsFailed(format!("set_size: {e}")))?;
+    child
+        .show()
+        .map_err(|e| AppError::WebviewShowFailed(format!("show: {e}")))?;
+
+    let mut s = state.state.lock().map_err(|_| AppError::Internal(String::from("lock")))?;
+    if let Some(prev) = s.visible.take() {
+        if let Some(prev_entry) = s.entries.get_mut(&prev) {
+            prev_entry.visible = false;
+        }
+    }
+    if let Some(entry) = s.entries.get_mut(&provider_id) {
+        entry.bounds = bounds;
+        entry.visible = true;
+    }
+    s.visible = Some(provider_id);
+    Ok(())
 }
 
 #[tauri::command]
@@ -90,48 +224,142 @@ pub async fn hide_provider_webview(
     state: tauri::State<'_, WebviewManager>,
     provider_id: ProviderId,
 ) -> AppResult<()> {
-    let mut s = state.0.lock().map_err(|_| AppError::Internal("lock".into()))?;
+    let mut s = state.state.lock().map_err(|_| AppError::Internal(String::from("lock")))?;
     if s.visible.as_deref() == Some(provider_id.as_str()) {
         s.visible = None;
+    }
+    if let Some(entry) = s.entries.get_mut(&provider_id) {
+        entry.visible = false;
     }
     Ok(())
 }
 
 #[tauri::command]
-pub async fn hide_all_provider_webviews(
+pub async fn hide_all_provider_webviews<R: Runtime>(
+    app: AppHandle<R>,
     state: tauri::State<'_, WebviewManager>,
 ) -> AppResult<()> {
-    let mut s = state.0.lock().map_err(|_| AppError::Internal("lock".into()))?;
+    let labels: Vec<String> = {
+        let s = state.state.lock().map_err(|_| AppError::Internal(String::from("lock")))?;
+        s.entries.values().map(|e| e.label.clone()).collect()
+    };
+    for label in labels {
+        if let Ok(wv) = get_webview_window(&app, &label) {
+            let _ = wv.hide();
+        }
+    }
+    let mut s = state.state.lock().map_err(|_| AppError::Internal(String::from("lock")))?;
+    for entry in s.entries.values_mut() {
+        entry.visible = false;
+    }
     s.visible = None;
     Ok(())
 }
 
 #[tauri::command]
-pub async fn set_provider_webview_bounds(
+pub async fn set_provider_webview_bounds<R: Runtime>(
+    app: AppHandle<R>,
     state: tauri::State<'_, WebviewManager>,
     provider_id: ProviderId,
     bounds: Bounds,
 ) -> AppResult<()> {
-    let mut s = state.0.lock().map_err(|_| AppError::Internal("lock".into()))?;
-    s.bounds.insert(provider_id, bounds);
+    let label = {
+        let s = state.state.lock().map_err(|_| AppError::Internal(String::from("lock")))?;
+        s.entries
+            .get(&provider_id)
+            .ok_or_else(|| AppError::ProviderNotFound(provider_id.clone()))?
+            .label
+            .clone()
+    };
+
+    let child = get_webview_window(&app, &label)?;
+
+    child
+        .set_position(LogicalPosition::new(bounds.x as f64, bounds.y as f64))
+        .map_err(|e| AppError::WebviewBoundsFailed(format!("set_position: {e}")))?;
+    child
+        .set_size(LogicalSize::new(bounds.width as f64, bounds.height as f64))
+        .map_err(|e| AppError::WebviewBoundsFailed(format!("set_size: {e}")))?;
+
+    let mut s = state.state.lock().map_err(|_| AppError::Internal(String::from("lock")))?;
+    if let Some(entry) = s.entries.get_mut(&provider_id) {
+        entry.bounds = bounds;
+    }
     Ok(())
 }
 
 #[tauri::command]
-pub async fn reload_provider_webview(
-    _app: AppHandle,
+pub async fn reload_provider_webview<R: Runtime>(
+    app: AppHandle<R>,
     state: tauri::State<'_, WebviewManager>,
     provider_id: ProviderId,
 ) -> AppResult<()> {
-    let mut s = state.0.lock().map_err(|_| AppError::Internal("lock".into()))?;
-    s.lifecycle.insert(provider_id, WebviewLifecycle::Loading);
-    Err(AppError::WebviewCreateFailed(
-        "Phase 2: not yet implemented".into(),
-    ))
+    let label = {
+        let s = state.state.lock().map_err(|_| AppError::Internal(String::from("lock")))?;
+        s.entries
+            .get(&provider_id)
+            .ok_or_else(|| AppError::ProviderNotFound(provider_id.clone()))?
+            .label
+            .clone()
+    };
+
+    let child = get_webview_window(&app, &label)?;
+    child
+        .reload()
+        .map_err(|e| AppError::WebviewCreateFailed(format!("reload: {e}")))?;
+    Ok(())
 }
 
-/// Main window label — used as the parent for embedded provider webviews
-/// in Phase 2.
+/// Main window label — used as the parent for embedded provider webviews.
 pub fn main_window_label() -> &'static str {
     "main"
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::ProviderConfig;
+    use crate::config::{
+        AppConfig, AppSection, DefaultProvider, UiConfig, WebviewConfig,
+    };
+
+    fn fixture_config() -> AppConfig {
+        AppConfig {
+            app: AppSection::default(),
+            providers: vec![ProviderConfig {
+                id: "qwen".into(),
+                name: "Qwen".into(),
+                icon_key: "qwen".into(),
+                url: "https://chat.qwen.ai/".into(),
+                enabled: true,
+                shortcut: None,
+                allowed_hosts: None,
+            }],
+            default_provider: DefaultProvider::default(),
+            webview: WebviewConfig::default(),
+            ui: UiConfig {
+                tab_bar: crate::config::TabBarConfig::default(),
+                draft_box: crate::config::DraftBoxConfig::default(),
+                toast: crate::config::ToastConfig::default(),
+                toolbar: crate::config::ToolbarConfig::default(),
+            },
+            security: crate::config::SecurityConfig::default(),
+            messages: crate::config::MessagesSection::default(),
+            shortcuts: crate::config::ShortcutsSection::default(),
+            future: crate::config::FutureSection::default(),
+        }
+    }
+
+    #[test]
+    fn manager_starts_empty() {
+        let m = WebviewManager::from_config(&fixture_config());
+        let snap = m.snapshot();
+        assert!(snap.entries.is_empty());
+        assert!(snap.visible.is_none());
+    }
+
+    #[test]
+    fn webview_label_format() {
+        assert_eq!(webview_label("qwen"), "provider-qwen");
+    }
 }
