@@ -611,4 +611,85 @@ mod tests {
         });
         assert!(validate(&v).is_err());
     }
+
+    #[test]
+    fn validate_rejects_bad_icon_key() {
+        let v = serde_json::json!({
+            "providers": [
+                {"id": "ok", "name": "O", "iconKey": "Has-Uppercase", "url": "https://ok/", "enabled": true},
+            ]
+        });
+        assert!(validate(&v).is_err());
+    }
+
+    #[test]
+    fn validate_rejects_duplicate_shortcut() {
+        let v = serde_json::json!({
+            "providers": [
+                {"id": "a", "name": "A", "iconKey": "a", "url": "https://a/", "enabled": true, "shortcut": "CmdOrCtrl+1"},
+                {"id": "b", "name": "B", "iconKey": "b", "url": "https://b/", "enabled": true, "shortcut": "CmdOrCtrl+1"},
+            ]
+        });
+        assert!(validate(&v).is_err());
+    }
+
+    #[test]
+    fn validate_rejects_bad_allowed_host() {
+        // Path component is not allowed in allowedHosts (§7.10 #2).
+        let v = serde_json::json!({
+            "providers": [
+                {
+                    "id": "x", "name": "X", "iconKey": "x",
+                    "url": "https://x.example/", "enabled": true,
+                    "allowedHosts": ["x.example/some-path"]
+                },
+            ]
+        });
+        assert!(validate(&v).is_err());
+    }
+
+    #[test]
+    fn validate_rejects_out_of_range_max_webviews() {
+        let v = serde_json::json!({
+            "providers": [
+                {"id": "x", "name": "X", "iconKey": "x", "url": "https://x/", "enabled": true},
+            ],
+            "webview": {"maxActiveWebviews": 99, "lazyLoad": true, "keepAlive": true},
+        });
+        assert!(validate(&v).is_err());
+    }
+
+    #[test]
+    fn deep_merge_preserves_user_providers_array() {
+        // §6.3 #2: user array replaces wholesale.
+        let base = serde_json::json!({
+            "providers": [{"id": "a", "enabled": true}, {"id": "b", "enabled": true}],
+        });
+        let user = serde_json::json!({
+            "providers": [{"id": "c", "enabled": true}],
+        });
+        let merged = deep_merge(base, user);
+        let providers = merged["providers"].as_array().unwrap();
+        assert_eq!(providers.len(), 1);
+        assert_eq!(providers[0]["id"], "c");
+    }
+
+    #[test]
+    fn user_config_missing_falls_back_to_default() {
+        let dir = std::env::temp_dir().join("aidesk-test-missing-fallback");
+        let path = dir.join("app.config.json");
+        let _ = std::fs::remove_file(&path);
+        let cfg = load_runtime_config(&path).expect("missing user config falls back");
+        assert!(!cfg.providers.is_empty());
+    }
+
+    #[test]
+    fn user_config_corrupt_falls_back_to_default() {
+        let dir = std::env::temp_dir().join("aidesk-test-corrupt-fallback");
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("app.config.json");
+        std::fs::write(&path, b"{ this is not valid json").unwrap();
+        let cfg = load_runtime_config(&path).expect("corrupt user config falls back");
+        assert!(!cfg.providers.is_empty());
+    }
 }

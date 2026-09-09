@@ -384,4 +384,23 @@ mod tests {
     fn webview_label_format() {
         assert_eq!(webview_label("qwen"), "provider-qwen");
     }
+
+    #[test]
+    fn webview_label_includes_provider_id_only() {
+        // Sanity check: only alphanumeric + dash/underscore, which is
+        // what Tauri's label validation accepts.
+        let label = webview_label("chatgpt");
+        assert!(label.starts_with("provider-"));
+        assert!(label
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '-'));
+    }
+
+    #[test]
+    fn snapshot_is_empty_after_construction() {
+        let m = WebviewManager::from_config(&fixture_config());
+        let snap = m.snapshot();
+        assert!(snap.entries.is_empty());
+        assert!(snap.visible.is_none());
+    }
 }

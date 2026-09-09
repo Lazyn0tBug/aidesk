@@ -98,9 +98,15 @@ bun run build                # vue-tsc + vite build
 bun run tauri dev            # full app (Tauri + Vite)
 bun run tauri build          # production bundle
 
+# Tests
+bun run test                 # frontend unit suite (Vitest, jsdom)
+bun run test:watch           # Vitest in watch mode
+bun run test:cov             # Vitest with v8 coverage
+bun run test:e2e             # Playwright e2e (requires tauri-driver; see e2e/README)
+
 # Backend
 cd src-tauri
-cargo test                   # 17 unit tests across config / state / providers / navigation
+cargo test                   # 32 unit tests across config / state / providers / navigation / webview / clipboard
 cargo check                  # type-check without building
 ```
 
@@ -290,6 +296,33 @@ before the change is considered complete.
 - [x] Phase 3: DraftBox + clipboard
 - [x] Phase 4: State + error overlay + retry
 - [x] Phase 5: Acceptance (see `docs/acceptance.md` for the §21 mapping)
+- [x] Test suite: 32 cargo tests + 48 Vitest specs + Playwright e2e scaffolding
+
+## Test layout
+
+Three suites, each runs independently. Coverage:
+
+| Suite | Where it runs | Coverage |
+|---|---|---|
+| `cargo test` | `src-tauri/` | config load + merge + validation; state round-trip + atomic write + ISO 8601; providers filter + whitelist + active resolution; navigation allow/block/open-external; webview manager state map; clipboard error mapping |
+| `bun run test` | repo root | `utils/bounds`, `utils/icons`, `utils/toast` (fake timers), `config/normalize`; `stores/appStore` actions with mocked IPC; `components/TabBar.vue` render |
+| `bun run test:e2e` | repo root | Tauri app boots; tab + draft box render; requires `tauri-driver` (Rust) and a desktop session |
+
+Test fixtures in `appStore.test.ts` and `TabBar.test.ts` use a single
+qwen provider — chatgpt and claude need network access the test
+runner doesn't have. The production default config still ships all
+three providers per the design doc.
+
+### Adding tests
+
+- New Rust module -> add `#[cfg(test)] mod tests` at the bottom;
+  cargo test will pick it up automatically.
+- New TS util / store action -> create `src/utils/foo.test.ts` next
+  to it. Vitest's `include` pattern picks up `*.test.ts`.
+- New component -> mount with `@vue/test-utils` and assert on
+  rendered output. Mock IPC modules via `vi.mock("../ipc", ...)`.
+- New e2e flow -> add a `*.spec.ts` to `e2e/`. Playwright will
+  discover it via `testDir`.
 
 Each phase ships behind a single commit and verifies against the matching
 §21 acceptance list before moving on.

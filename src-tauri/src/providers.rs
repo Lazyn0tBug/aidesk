@@ -235,4 +235,59 @@ mod tests {
             Some("b".into())
         );
     }
+
+    #[test]
+    fn enabled_providers_filters_out_disabled() {
+        let mut cfg = minimal_config();
+        cfg.providers.push(ProviderConfig {
+            id: "on".into(),
+            name: "On".into(),
+            icon_key: "on".into(),
+            url: "https://on.example/".into(),
+            enabled: true,
+            shortcut: None,
+            allowed_hosts: None,
+        });
+        cfg.providers.push(ProviderConfig {
+            id: "off".into(),
+            name: "Off".into(),
+            icon_key: "off".into(),
+            url: "https://off.example/".into(),
+            enabled: false,
+            shortcut: None,
+            allowed_hosts: None,
+        });
+        let enabled = enabled_providers(&cfg);
+        assert_eq!(enabled.len(), 1);
+        assert_eq!(enabled[0].id, "on");
+    }
+
+    #[test]
+    fn find_enabled_errors_when_disabled() {
+        let mut cfg = minimal_config();
+        cfg.providers.push(ProviderConfig {
+            id: "off".into(),
+            name: "Off".into(),
+            icon_key: "off".into(),
+            url: "https://off.example/".into(),
+            enabled: false,
+            shortcut: None,
+            allowed_hosts: None,
+        });
+        let err = find_enabled(&cfg, "off").unwrap_err();
+        assert_eq!(err.code().as_str(), "PROVIDER_DISABLED");
+    }
+
+    #[test]
+    fn find_enabled_errors_when_unknown() {
+        let cfg = minimal_config();
+        let err = find_enabled(&cfg, "ghost").unwrap_err();
+        assert_eq!(err.code().as_str(), "PROVIDER_NOT_FOUND");
+    }
+
+    #[test]
+    fn resolve_active_returns_null_when_no_enabled_providers() {
+        let cfg = minimal_config();
+        assert_eq!(resolve_active_provider(&cfg, None), None);
+    }
 }

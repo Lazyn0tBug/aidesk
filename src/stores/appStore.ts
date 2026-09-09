@@ -153,6 +153,16 @@ function setVisibleFlag(id: ProviderId | null) {
   }
 }
 
+/**
+ * Synchronous state setter for the active provider. Used by
+ * `switchProvider` (which adds IPC on top) and by tests.
+ */
+export function setActiveProvider(id: ProviderId) {
+  if (state.activeProviderId === id) return;
+  state.activeProviderId = id;
+  setVisibleFlag(id);
+}
+
 // -----------------------------------------------------------------------------
 // Actions (call IPC; orchestrate Phase 2 lifecycle, §15.2)
 // -----------------------------------------------------------------------------
@@ -167,7 +177,7 @@ export async function switchProvider(id: ProviderId, bounds: Bounds): Promise<vo
   if (!state.config) return;
   const prev = state.activeProviderId;
 
-  setActiveProviderLocal(id);
+  setActiveProvider(id);
   setLastActiveProvider(id).catch(() => {});
 
   const wv = state.webviews[id];
@@ -216,12 +226,4 @@ export async function reloadActive(id: ProviderId): Promise<void> {
     console.error(`[aidesk] reloadProvider(${id}) failed`, err);
     markProviderError(id);
   }
-}
-
-// Local setter used by switchProvider before the webview is up. Kept
-// private to avoid components calling it directly.
-function setActiveProviderLocal(id: ProviderId) {
-  if (state.activeProviderId === id) return;
-  state.activeProviderId = id;
-  setVisibleFlag(id);
 }
