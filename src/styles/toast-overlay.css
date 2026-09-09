@@ -1,0 +1,60 @@
+/*
+ * Styles for the toast overlay webview (toast.html → ToastApp.vue).
+ *
+ * The overlay webview covers the full main-window content area with a
+ * transparent background. The toast container is fixed to bottom-right
+ * so it doesn't need to know the window size — the browser's fixed
+ * positioning anchors it to the viewport corner.
+ */
+
+@import "tailwindcss";
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  background: transparent;
+}
+
+body {
+  /* No scrollbar; the overlay is informational only. */
+  overflow: hidden;
+}
+
+.toast-stack {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+  /* Let pointer events fall through to the provider webview underneath
+     unless the user is hovering a toast. */
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.4;
+  max-width: 320px;
+  color: var(--color-ink);
+  background: var(--color-surface-3);
+  border: 1px solid var(--color-line);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.12);
+}
+
+.toast-success {
+  background: var(--color-success-soft);
+  color: var(--color-success);
+  border-color: var(--color-success);
+}
+
+.toast-error {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+}

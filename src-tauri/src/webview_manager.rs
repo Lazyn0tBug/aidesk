@@ -1,11 +1,17 @@
 //! WebView lifecycle manager (design §13.5).
 //!
 //! Phase 2: real Tauri v2 webview management. Each enabled provider gets
-//! one child window of the main window via `WebviewWindowBuilder::parent`,
-//! which is the supported (non-`unstable`) way to mount webviews inside
-//! the main shell in Tauri v2. Navigation is gated by an `on_navigation`
-//! hook that consults the per-provider whitelist from
-//! `providers::provider_allowed_hosts` (design §4.6, §16).
+//! one embedded webview attached to the main window via
+//! `Window::add_child(WebviewBuilder, position, size)`. This is the only
+//! path in Tauri v2 that renders the provider's content INSIDE the main
+//! window's frame — the alternative `WebviewWindowBuilder::parent()`
+//! creates a separate child OS window, not an embedded view. The
+//! `add_child` API is gated on the `unstable` feature flag, which we
+//! enable in `Cargo.toml` (the only place this flag is needed).
+//!
+//! Navigation is gated by an `on_navigation` hook that consults the
+//! per-provider whitelist from `providers::provider_allowed_hosts`
+//! (design §4.6, §16).
 //!
 //! Concurrency: a single `Mutex<WebviewState>` guards the in-memory map.
 //! Locks are held only long enough to read or update an entry; no Tauri
@@ -15,9 +21,9 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
-use tauri::{
-    AppHandle, LogicalPosition, LogicalSize, Manager, Runtime, WebviewUrl, WebviewWindowBuilder,
-};
+use tauri::webview::WebviewBuilder;
+use tauri::window::Color;
+use tauri::{AppHandle, LogicalPosition, LogicalSize, Manager, Runtime, WebviewUrl};
 
 use crate::config::{AppConfig, ProviderId};
 use crate::error::{AppError, AppResult};
@@ -41,6 +47,10 @@ pub struct WebviewState {
     pub entries: HashMap<ProviderId, WebviewEntry>,
     /// Currently visible provider, if any. At most one per design §3.1 #4.
     pub visible: Option<ProviderId>,
+    /// True once the toast overlay child webview has been attached.
+    /// Used to make `attach_toast_overlay` idempotent (re-calling it on
+    /// every bounds emission then just resizes the overlay).
+    pub toast_attached: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -74,6 +84,7 @@ impl WebviewManager {
             .map(|s| WebviewState {
                 entries: s.entries.clone(),
                 visible: s.visible.clone(),
+                toast_attached: s.toast_attached,
             })
             .unwrap_or_default()
     }
@@ -83,13 +94,27 @@ fn webview_label(provider_id: &str) -> String {
     format!("provider-{provider_id}")
 }
 
-/// Look up a child webview window by label.
-fn get_webview_window<R: Runtime>(
+/// Reserved label for the toast overlay child webview.
+fn toast_label() -> &'static str {
+    "toast"
+}
+
+/// Look up an embedded child webview by label.
+fn get_child_webview<R: Runtime>(
     app: &AppHandle<R>,
     label: &str,
-) -> AppResult<tauri::WebviewWindow<R>> {
-    app.get_webview_window(label)
+) -> AppResult<tauri::Webview<R>> {
+    app.get_webview(label)
         .ok_or_else(|| AppError::WebviewCreateFailed(format!("webview {label} not found")))
+}
+
+/// Look up the main `Window` — needed so we can call `add_child` to
+/// attach embedded provider webviews to it. We use `get_window` (not
+/// `get_webview_window`) because `add_child` is defined on `Window<R>`,
+/// not `WebviewWindow<R>`.
+fn get_main_window<R: Runtime>(app: &AppHandle<R>) -> AppResult<tauri::Window<R>> {
+    app.get_window(main_window_label())
+        .ok_or_else(|| AppError::WebviewCreateFailed(format!("main window not found")))
 }
 
 // -----------------------------------------------------------------------------
@@ -132,43 +157,43 @@ pub async fn create_provider_webview<R: Runtime>(
     let cfg_for_decide = cfg.clone();
     let app_for_decide = app.clone();
 
-    let parent_window = get_webview_window(&app, main_window_label())?;
-    let child = WebviewWindowBuilder::new(&app, &label, url)
-        .parent(&parent_window)
-        .map_err(|e| AppError::WebviewCreateFailed(format!("set parent: {e}")))?
-        .on_navigation(move |nav_url: &url::Url| {
-            let decision = navigation::decide(&cfg_for_decide, &provider_for_decide, nav_url.as_str());
-            match decision {
-                Ok(navigation::NavigationDecision::Allow) => true,
-                Ok(navigation::NavigationDecision::Block) => false,
-                Ok(navigation::NavigationDecision::OpenExternal) => {
-                    if open_external {
-                        // Spawn an external-browser open from the
-                        // navigation hook. The hook itself returns
-                        // false so the in-webview navigation is blocked.
-                        let app = app_for_decide.clone();
-                        let url = nav_url.to_string();
-                        tauri::async_runtime::spawn(async move {
-                            use tauri_plugin_opener::OpenerExt;
-                            if let Err(e) = app.opener().open_url(url, None::<&str>) {
-                                eprintln!("[aidesk] open_url failed: {e}");
-                            }
-                        });
+    let parent_window = get_main_window(&app)?;
+    parent_window
+        .add_child(
+            WebviewBuilder::new(&label, url).on_navigation(move |nav_url: &url::Url| {
+                let decision =
+                    navigation::decide(&cfg_for_decide, &provider_for_decide, nav_url.as_str());
+                match decision {
+                    Ok(navigation::NavigationDecision::Allow) => true,
+                    Ok(navigation::NavigationDecision::Block) => false,
+                    Ok(navigation::NavigationDecision::OpenExternal) => {
+                        if open_external {
+                            // Spawn an external-browser open from the
+                            // navigation hook. The hook itself returns
+                            // false so the in-webview navigation is blocked.
+                            let app = app_for_decide.clone();
+                            let url = nav_url.to_string();
+                            tauri::async_runtime::spawn(async move {
+                                use tauri_plugin_opener::OpenerExt;
+                                if let Err(e) = app.opener().open_url(url, None::<&str>) {
+                                    eprintln!("[aidesk] open_url failed: {e}");
+                                }
+                            });
+                        }
+                        false
                     }
-                    false
+                    Err(_) => false,
                 }
-                Err(_) => false,
-            }
-        })
-        .build()
-        .map_err(|e| AppError::WebviewCreateFailed(format!("build: {e}")))?;
-
-    child
-        .set_position(LogicalPosition::new(bounds.x as f64, bounds.y as f64))
-        .map_err(|e| AppError::WebviewBoundsFailed(format!("set_position: {e}")))?;
-    child
-        .set_size(LogicalSize::new(bounds.width as f64, bounds.height as f64))
-        .map_err(|e| AppError::WebviewBoundsFailed(format!("set_size: {e}")))?;
+            }),
+            // Embedded children take coordinates in the parent's content
+            // area, in logical pixels. No title-bar offset or scale-factor
+            // math needed (compare to the `WebviewWindowBuilder::parent`
+            // path which produces a separate OS window at screen-absolute
+            // coords).
+            LogicalPosition::new(bounds.x as f64, bounds.y as f64),
+            LogicalSize::new(bounds.width as f64, bounds.height as f64),
+        )
+        .map_err(|e| AppError::WebviewCreateFailed(format!("add_child: {e}")))?;
 
     let mut s = state.state.lock().map_err(|_| AppError::Internal(String::from("lock")))?;
     s.entries.insert(
@@ -210,13 +235,12 @@ pub async fn show_provider_webview<R: Runtime>(
     };
 
     if let Some(prev_label) = to_hide {
-        if let Ok(prev) = get_webview_window(&app, &prev_label) {
+        if let Ok(prev) = get_child_webview(&app, &prev_label) {
             let _ = prev.hide();
         }
     }
 
-    let child = get_webview_window(&app, &label)?;
-
+    let child = get_child_webview(&app, &label)?;
     child
         .set_position(LogicalPosition::new(bounds.x as f64, bounds.y as f64))
         .map_err(|e| AppError::WebviewBoundsFailed(format!("set_position: {e}")))?;
@@ -266,7 +290,7 @@ pub async fn hide_all_provider_webviews<R: Runtime>(
         s.entries.values().map(|e| e.label.clone()).collect()
     };
     for label in labels {
-        if let Ok(wv) = get_webview_window(&app, &label) {
+        if let Ok(wv) = get_child_webview(&app, &label) {
             let _ = wv.hide();
         }
     }
@@ -294,8 +318,7 @@ pub async fn set_provider_webview_bounds<R: Runtime>(
             .clone()
     };
 
-    let child = get_webview_window(&app, &label)?;
-
+    let child = get_child_webview(&app, &label)?;
     child
         .set_position(LogicalPosition::new(bounds.x as f64, bounds.y as f64))
         .map_err(|e| AppError::WebviewBoundsFailed(format!("set_position: {e}")))?;
@@ -325,10 +348,68 @@ pub async fn reload_provider_webview<R: Runtime>(
             .clone()
     };
 
-    let child = get_webview_window(&app, &label)?;
+    let child = get_child_webview(&app, &label)?;
     child
         .reload()
         .map_err(|e| AppError::WebviewCreateFailed(format!("reload: {e}")))?;
+    Ok(())
+}
+
+/// Attach (or resize) the toast overlay child webview.
+///
+/// The toast overlay covers the entire main-window content area with a
+/// transparent background, so it can be positioned at `(0, 0)` with
+/// the full content size. The toast `<div>` is `position: fixed` inside
+/// the overlay HTML, anchored to bottom-right — the overlay itself
+/// doesn't need to know the toast's position.
+///
+/// `add_child` is called on the first invocation; subsequent calls
+/// just resize the existing overlay. This makes the command safe to
+/// invoke on every bounds emission from the frontend.
+///
+/// The toast overlay must be attached **after** any provider webview
+/// for the native z-order to put it on top — `Window::add_child` adds
+/// children in z-order top-most last. The frontend guarantees this by
+/// calling `attach_toast_overlay` from `App.vue::onBounds`, which
+/// fires after the active provider has been created/shown.
+#[tauri::command]
+pub async fn attach_toast_overlay<R: Runtime>(
+    app: AppHandle<R>,
+    state: tauri::State<'_, WebviewManager>,
+    bounds: Bounds,
+) -> AppResult<()> {
+    let already_attached = {
+        let s = state.state.lock().map_err(|_| AppError::Internal(String::from("lock")))?;
+        s.toast_attached
+    };
+
+    if already_attached {
+        // Just resize the existing overlay.
+        let child = get_child_webview(&app, toast_label())?;
+        child
+            .set_size(LogicalSize::new(bounds.width as f64, bounds.height as f64))
+            .map_err(|e| AppError::WebviewBoundsFailed(format!("toast set_size: {e}")))?;
+        return Ok(());
+    }
+
+    let parent_window = get_main_window(&app)?;
+    parent_window
+        .add_child(
+            // `Color(0,0,0,0)` makes the OS-level webview background
+            // transparent — without this, the overlay covers the TabBar
+            // and any other HTML behind it with the platform's default
+            // (usually white). The HTML body is also `background:
+            // transparent` for belt-and-suspenders, but the OS layer is
+            // the one that paints first.
+            WebviewBuilder::new(toast_label(), WebviewUrl::App("toast.html".into()))
+                .background_color(Color(0, 0, 0, 0)),
+            LogicalPosition::new(0.0, 0.0),
+            LogicalSize::new(bounds.width as f64, bounds.height as f64),
+        )
+        .map_err(|e| AppError::WebviewCreateFailed(format!("toast add_child: {e}")))?;
+
+    let mut s = state.state.lock().map_err(|_| AppError::Internal(String::from("lock")))?;
+    s.toast_attached = true;
     Ok(())
 }
 

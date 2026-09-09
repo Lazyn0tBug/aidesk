@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 import tailwindcss from "@tailwindcss/vite";
+import { resolve } from "node:path";
 // @ts-expect-error type error without @types/node package
 import process from "node:process";
 const host = process.env.TAURI_DEV_HOST;
@@ -28,6 +29,20 @@ export default defineConfig(() => ({
     watch: {
       // 3. tell Vite to ignore watching `src-tauri`
       ignored: ["**/src-tauri/**"],
+    },
+  },
+
+  build: {
+    rollupOptions: {
+      input: {
+        // Main window (TabBar + WebViewArea)
+        main: resolve(__dirname, "index.html"),
+        // Toast overlay — embedded child webview attached last so it
+        // draws on top of the active provider webview. See
+        // `webview_manager.rs::attach_toast_overlay` and
+        // `components/ToastApp.vue`.
+        toast: resolve(__dirname, "toast.html"),
+      },
     },
   },
 }));

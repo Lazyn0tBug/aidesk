@@ -1,13 +1,13 @@
 <script setup lang="ts">
-// App root — orchestrates TabBar, DraftBox, WebViewArea, Toast.
-// Implements the startup flow from design §15.1, switching §15.2,
-// enter §15.3, and resize §15.4.
+// App root — orchestrates TabBar, DraftBox, WebViewArea, and the
+// toast overlay (which lives in its own embedded child webview — see
+// `ToastApp.vue`). Implements the startup flow from design §15.1,
+// switching §15.2, enter §15.3, and resize §15.4.
 
 import { computed, onMounted, ref } from "vue";
 import TabBar from "./components/TabBar.vue";
 import DraftBox from "./components/DraftBox.vue";
 import WebViewArea from "./components/WebViewArea.vue";
-import Toast from "./components/Toast.vue";
 import {
   activeProvider,
   hydrateStore,
@@ -18,8 +18,7 @@ import {
 } from "./stores/appStore";
 import { bindToastConfig, pushToast } from "./utils/toast";
 import { calculateWebViewBounds } from "./utils/bounds";
-import { getAppConfig, getLastActiveProvider } from "./ipc";
-import { copyText } from "./ipc/clipboard";
+import { attachToastOverlay, copyText, getAppConfig, getLastActiveProvider } from "./ipc";
 import type { Bounds, ProviderId } from "./types";
 
 const store = useAppStore();
@@ -130,6 +129,13 @@ async function onReload(id: string) {
 async function onBounds(b: Bounds) {
   lastBounds.value = b;
 
+  // Lazily attach the toast overlay child webview. Idempotent in Rust,
+  // so this is cheap to call on every bounds change. Attached AFTER
+  // any provider webview (it's the most recent `add_child` call), so
+  // the native z-order puts it on top — the only way HTML toasts can
+  // draw above an embedded provider webview.
+  void attachToastOverlay(b).catch(() => {});
+
   // First-time case: when bounds first arrive, eagerly create + show
   // the active provider (design §15.1 step 13). Subsequent emissions
   // only need to update the active webview's bounds.
@@ -172,6 +178,5 @@ async function onBounds(b: Bounds) {
         @bounds="onBounds"
       />
     </template>
-    <Toast />
   </div>
 </template>
