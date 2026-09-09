@@ -28,16 +28,15 @@ function onInput(e: Event) {
 
 function onKeydown(e: KeyboardEvent) {
   if (e.key !== "Enter" || e.shiftKey) return;
-  // Enter without Shift copies + switches (design §4.4 #10).
   e.preventDefault();
   emit("submit");
 }
 </script>
 
 <template>
-  <section v-if="config.enabled" class="draft-box" role="group" aria-label="Prompt draft">
+  <section v-if="config.enabled" class="flex-none px-3 py-2 border-b border-line bg-surface-2" role="group" aria-label="Prompt draft">
     <textarea
-      class="draft-box__input"
+      class="w-full resize-y font-sans text-[14px] px-2.5 py-2 rounded-md border bg-surface text-ink outline-none transition-colors focus:border-accent"
       :placeholder="config.placeholder"
       :rows="rows"
       :value="value"
@@ -46,31 +45,3 @@ function onKeydown(e: KeyboardEvent) {
     />
   </section>
 </template>
-
-<style scoped>
-.draft-box {
-  flex: 0 0 auto;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--aidesk-border);
-  background: var(--aidesk-bg-2);
-}
-
-.draft-box__input {
-  width: 100%;
-  resize: vertical;
-  font: inherit;
-  font-size: 14px;
-  padding: 8px 10px;
-  border-radius: 6px;
-  border: 1px solid var(--aidesk-border);
-  background: var(--aidesk-bg-1);
-  color: var(--aidesk-fg-1);
-  box-sizing: border-box;
-  outline: none;
-  transition: border-color 0.15s ease;
-}
-
-.draft-box__input:focus {
-  border-color: var(--aidesk-accent-fg);
-}
-</style>

@@ -11,6 +11,8 @@ tabs, with a shared prompt draft box that copies to clipboard on switch.
 | Backend | Rust 2021 | modules under `src-tauri/src/` |
 | Frontend | Vue 3 (`<script setup lang="ts">`) | design doc was written for React; component names + IPC contracts carry over, only file extension differs |
 | Bundler | Vite | port 1420 fixed for Tauri dev |
+| CSS | Tailwind v4 (`@tailwindcss/vite`) | CSS-first config in `src/styles/global.css`; no `tailwind.config.js` |
+| Color space | OKLCH | declared in `@theme` block; light + `prefers-color-scheme: dark` override |
 | Package manager | Bun | `bun.lock` is intentionally **not** tracked (see Lockfile policy below) |
 | Test runner | Rust `cargo test` | frontend has no test setup yet |
 
@@ -128,6 +130,15 @@ references `bun run` for `beforeDevCommand` / `beforeBuildCommand`.
   the config object received from Rust.
 - Icons resolve to `/icons/{iconKey}.png` (fallback to a placeholder badge if
   absent).
+- **Styling uses Tailwind v4 utilities, not scoped CSS.** Component
+  scoped styles are kept only for `@keyframes` and other things
+  utilities can't express. All tokens (color, font, ring width) live in
+  `src/styles/global.css` under `@theme`; the matching utilities
+  (`bg-surface`, `text-ink`, `border-line`, etc.) are auto-generated.
+  Don't introduce a `tailwind.config.js` — v4 is CSS-first by design.
+- **Colors are OKLCH.** Light values in `:root`; dark values override
+  inside `@media (prefers-color-scheme: dark)`. Never hand-pick hex or
+  RGB — OKLCH keeps light/dark pairs perceptually balanced.
 
 ### Config
 
@@ -233,6 +244,16 @@ that depends on it. Use this checklist before opening the PR:
 | Add a new Tauri command | `commands.rs` (or its module), `lib.rs` handler list, `src/ipc/*.ts` wrapper, TS type in `src/types.ts` |
 | Add a new module | `pub mod` in `lib.rs`, the Module map in this file, the `Layout` block |
 | Delete a feature | tests, design-doc `// §X.Y` comments, `app.config.default.json`, `schemas/app.config.schema.json`, the Phase status list |
+| Add / rename / remove a Tailwind theme token | `src/styles/global.css` `@theme` block (light + dark override), every `bg-*` / `text-*` / `border-*` utility usage in components |
+| Change a component's visual treatment | the SFC template (`class="..."`); if the change is a one-off, no scope impact; if a recurring pattern, promote to a `@theme` token |
+
+Always end a refactor commit with `cargo check` + `cargo test` from
+`src-tauri/` and `bun run build` from the repo root. Both must succeed
+before the change is considered complete.
+
+Always end a refactor commit with `cargo check` + `cargo test` from
+`src-tauri/` and `bun run build` from the repo root. Both must succeed
+before the change is considered complete.
 
 Always end a refactor commit with `cargo check` + `cargo test` from
 `src-tauri/` and `bun run build` from the repo root. Both must succeed

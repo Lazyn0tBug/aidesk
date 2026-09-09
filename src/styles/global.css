@@ -1,51 +1,98 @@
-:root {
-  --aidesk-bg-1: #ffffff;
-  --aidesk-bg-2: #f6f6f6;
-  --aidesk-bg-3: #ececec;
-  --aidesk-fg-1: #1a1a1a;
-  --aidesk-fg-2: #6b6b6b;
-  --aidesk-border: #e0e0e0;
-  --aidesk-accent-bg: #e8f1ff;
-  --aidesk-accent-fg: #2563eb;
-  --aidesk-success-bg: #e6f6ec;
-  --aidesk-success-fg: #16794c;
-  --aidesk-danger-bg: #fdecec;
-  --aidesk-danger-fg: #b3261e;
+@import "tailwindcss";
 
-  font-family: Inter, "Helvetica Neue", system-ui, -apple-system, "Segoe UI",
+/* -------------------------------------------------------------------------
+ * Design tokens — OKLCH for perceptually uniform color.
+ * Light values are defined here; dark values override inside the
+ * `@media (prefers-color-scheme: dark)` block further down.
+ *
+ * Naming uses Tailwind v4's @theme convention so the variables double as
+ * utility generators (`bg-surface`, `text-ink`, `border-line`, etc.).
+ * ------------------------------------------------------------------------- */
+
+@theme {
+  /* surfaces */
+  --color-surface: oklch(99% 0.005 250);
+  --color-surface-2: oklch(97% 0.005 250);
+  --color-surface-3: oklch(93% 0.006 250);
+
+  /* ink (foreground) */
+  --color-ink: oklch(22% 0.012 260);
+  --color-ink-2: oklch(48% 0.01 260);
+
+  /* dividers */
+  --color-line: oklch(90% 0.006 260);
+
+  /* accent (tabs, focus rings) */
+  --color-accent-soft: oklch(96% 0.025 250);
+  --color-accent: oklch(55% 0.2 252);
+
+  /* status — semantic colors used by toast + tab state indicators */
+  --color-success-soft: oklch(96% 0.04 150);
+  --color-success: oklch(46% 0.15 152);
+  --color-danger-soft: oklch(96% 0.05 25);
+  --color-danger: oklch(52% 0.2 25);
+
+  /* font stack: prefers native UI fonts then CJK fallbacks (we render Chinese strings) */
+  --font-sans:
+    "Inter", "Helvetica Neue", system-ui, -apple-system, "Segoe UI",
     "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-  font-size: 14px;
-  color-scheme: light dark;
+
+  /* ring widths for focus outlines */
+  --default-ring-width: 2px;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --aidesk-bg-1: #1a1a1a;
-    --aidesk-bg-2: #232323;
-    --aidesk-bg-3: #2d2d2d;
-    --aidesk-fg-1: #f0f0f0;
-    --aidesk-fg-2: #9a9a9a;
-    --aidesk-border: #353535;
-    --aidesk-accent-bg: #1f2c45;
-    --aidesk-accent-fg: #6ea8ff;
-    --aidesk-success-bg: #14321f;
-    --aidesk-success-fg: #6fd99b;
-    --aidesk-danger-bg: #3a1414;
-    --aidesk-danger-fg: #f57b73;
+  @theme {
+    --color-surface: oklch(15% 0.01 260);
+    --color-surface-2: oklch(18% 0.01 260);
+    --color-surface-3: oklch(23% 0.012 260);
+
+    --color-ink: oklch(95% 0.006 260);
+    --color-ink-2: oklch(70% 0.008 260);
+
+    --color-line: oklch(28% 0.012 260);
+
+    --color-accent-soft: oklch(28% 0.05 252);
+    --color-accent: oklch(74% 0.15 252);
+
+    --color-success-soft: oklch(25% 0.05 152);
+    --color-success: oklch(74% 0.14 152);
+
+    --color-danger-soft: oklch(25% 0.06 25);
+    --color-danger: oklch(74% 0.18 25);
   }
 }
 
-* {
-  box-sizing: border-box;
-}
+/* -------------------------------------------------------------------------
+ * Base layer — element resets + body baseline.
+ * ------------------------------------------------------------------------- */
 
-html, body, #app {
-  margin: 0;
-  padding: 0;
-  height: 100%;
-}
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
 
-body {
-  background: var(--aidesk-bg-1);
-  color: var(--aidesk-fg-1);
+  html,
+  body,
+  #app {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    background-color: var(--color-surface);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Respect the OS color scheme for native form controls. */
+  :root {
+    color-scheme: light dark;
+  }
 }

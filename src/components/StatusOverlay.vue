@@ -22,62 +22,33 @@ const loadingText = computed(() => {
 </script>
 
 <template>
-  <div class="status-overlay" :class="`status-overlay--${state}`">
+  <div
+    class="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-surface text-ink-2"
+    :class="`status-overlay--${state}`"
+  >
     <template v-if="state === 'loading'">
-      <div class="status-overlay__spinner" aria-hidden="true" />
-      <p class="status-overlay__msg">{{ loadingText }}</p>
+      <div class="status-overlay__spinner size-7" aria-hidden="true" />
+      <p class="m-0 text-[14px]">{{ loadingText }}</p>
     </template>
     <template v-else>
-      <p class="status-overlay__msg">{{ messages.loadFailed }}</p>
-      <button type="button" class="status-overlay__btn" @click="emit('reload')">
-        {{ messages.reload }}
-      </button>
+      <p class="m-0 text-[14px]">{{ messages.loadFailed }}</p>
+      <button
+        type="button"
+        class="px-3.5 py-1.5 rounded-md border border-line bg-surface-2 text-ink hover:border-accent cursor-pointer font-sans"
+        @click="emit('reload')"
+      >{{ messages.reload }}</button>
     </template>
   </div>
 </template>
 
 <style scoped>
-.status-overlay {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  color: var(--aidesk-fg-2);
-  background: var(--aidesk-bg-1);
-}
-
-.status-overlay__spinner {
-  width: 28px;
-  height: 28px;
-  border: 3px solid var(--aidesk-bg-3);
-  border-top-color: var(--aidesk-accent-fg);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-.status-overlay__msg {
-  margin: 0;
-  font-size: 14px;
-}
-
-.status-overlay__btn {
-  padding: 6px 14px;
-  border-radius: 6px;
-  border: 1px solid var(--aidesk-border);
-  background: var(--aidesk-bg-2);
-  color: var(--aidesk-fg-1);
-  cursor: pointer;
-  font: inherit;
-}
-
-.status-overlay__btn:hover {
-  border-color: var(--aidesk-accent-fg);
-}
-
-@keyframes spin {
+@keyframes status-spin {
   to { transform: rotate(360deg); }
+}
+.status-overlay__spinner {
+  border-radius: 9999px;
+  border: 3px solid var(--color-surface-3);
+  border-top-color: var(--color-accent);
+  animation: status-spin 0.8s linear infinite;
 }
 </style>

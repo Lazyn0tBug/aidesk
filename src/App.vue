@@ -35,12 +35,8 @@ onMounted(async () => {
     hydrateStore(config, lastActive);
     if (store.config?.ui.toast) bindToastConfig(store.config.ui.toast);
 
-    // Mark the active provider as loading on first paint; Phase 2 will
-    // wire the actual webview creation command.
     if (store.activeProviderId) {
       markProviderLoading(store.activeProviderId);
-      // Simulate "ready" after a short delay so the loading state is
-      // observable in development. Real wiring in Phase 2.
       window.setTimeout(() => {
         if (store.activeProviderId) markProviderReady(store.activeProviderId);
       }, 800);
@@ -113,14 +109,14 @@ function onBounds(b: Bounds) {
 </script>
 
 <template>
-  <div class="app">
+  <div class="flex flex-col h-screen overflow-hidden">
     <template v-if="!ready">
-      <div class="app__loading">Loading AIDesk…</div>
+      <div class="flex-1 flex items-center justify-center text-ink-2">Loading AIDesk…</div>
     </template>
     <template v-else-if="loadError">
-      <div class="app__error">
+      <div class="flex-1 flex flex-col items-center justify-center gap-3 text-ink-2">
         <p>Startup error:</p>
-        <pre>{{ loadError }}</pre>
+        <pre class="whitespace-pre-wrap bg-surface-2 px-3 py-3 rounded-md">{{ loadError }}</pre>
       </div>
     </template>
     <template v-else-if="store.config">
@@ -144,28 +140,3 @@ function onBounds(b: Bounds) {
     <Toast />
   </div>
 </template>
-
-<style scoped>
-.app {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  overflow: hidden;
-}
-
-.app__loading,
-.app__error {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: 1;
-  color: var(--aidesk-fg-2);
-}
-
-.app__error pre {
-  white-space: pre-wrap;
-  background: var(--aidesk-bg-2);
-  padding: 12px;
-  border-radius: 6px;
-}
-</style>

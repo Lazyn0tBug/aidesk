@@ -1,7 +1,6 @@
 <script setup lang="ts">
-// §4.2 TabBar.
-// Renders one tab per enabled provider, with active/loading/error styling
-// (design §5.4). Emits `select` when a tab is clicked.
+// §4.2 TabBar. Renders one tab per enabled provider with active /
+// loading / error styling (design §5.4). Emits `select` on click.
 
 import { computed } from "vue";
 import { useAppStore } from "../stores/appStore";
@@ -36,7 +35,11 @@ const onClick = (id: ProviderId) => {
 </script>
 
 <template>
-  <header class="tab-bar" role="tablist" aria-label="Provider tabs">
+  <header
+    class="flex flex-none h-11 px-2 gap-1 items-stretch border-b border-line bg-surface-2"
+    role="tablist"
+    aria-label="Provider tabs"
+  >
     <button
       v-for="tab in tabs"
       :key="tab.id"
@@ -44,107 +47,44 @@ const onClick = (id: ProviderId) => {
       role="tab"
       :aria-selected="store.activeProviderId === tab.id"
       :class="[
-        'tab',
-        { 'tab--active': store.activeProviderId === tab.id },
-        { 'tab--loading': store.webviews[tab.id]?.loading },
-        { 'tab--error': store.webviews[tab.id]?.error },
+        'group inline-flex items-center gap-1.5 px-3 rounded-md text-[13px] transition-colors cursor-pointer',
+        'bg-transparent text-ink-2 hover:bg-surface-3 hover:text-ink',
+        store.activeProviderId === tab.id && 'bg-accent-soft text-accent',
+        store.webviews[tab.id]?.loading && 'tab--loading',
+        store.webviews[tab.id]?.error && 'text-danger',
       ]"
       @click="onClick(tab.id)"
     >
-      <span v-if="showIconFor(tab)" class="tab__icon" aria-hidden="true">
+      <span v-if="showIconFor(tab)" class="size-5 inline-flex items-center justify-center" aria-hidden="true">
         <img
           v-if="resolveIcon(tab.iconKey)"
           :src="resolveIcon(tab.iconKey)!.src"
           :alt="''"
+          class="size-5 rounded object-contain"
           @error="($event.target as HTMLImageElement).style.display = 'none'"
         />
-        <span v-else class="tab__icon-fallback">{{ iconFallbackLabel(tab.name) }}</span>
+        <span
+          v-else
+          class="size-5 inline-flex items-center justify-center rounded bg-surface-3 text-ink-2 text-[11px] font-semibold"
+        >{{ iconFallbackLabel(tab.name) }}</span>
       </span>
-      <span v-if="showNameFor(tab)" class="tab__name">{{ tab.name }}</span>
+      <span v-if="showNameFor(tab)">{{ tab.name }}</span>
     </button>
   </header>
 </template>
 
 <style scoped>
-.tab-bar {
-  display: flex;
-  flex: 0 0 auto;
-  height: 44px;
-  padding: 0 8px;
-  gap: 4px;
-  align-items: stretch;
-  border-bottom: 1px solid var(--aidesk-border);
-  background: var(--aidesk-bg-2);
+@keyframes tab-pulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
 }
-
-.tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 12px;
-  border: none;
-  background: transparent;
-  color: var(--aidesk-fg-2);
-  cursor: pointer;
-  border-radius: 6px;
-  font: inherit;
-  font-size: 13px;
-  transition: background-color 0.15s ease, color 0.15s ease;
-}
-
-.tab:hover {
-  background: var(--aidesk-bg-3);
-  color: var(--aidesk-fg-1);
-}
-
-.tab--active {
-  background: var(--aidesk-accent-bg);
-  color: var(--aidesk-accent-fg);
-}
-
-.tab__icon {
-  width: 20px;
-  height: 20px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.tab__icon img {
-  width: 20px;
-  height: 20px;
-  border-radius: 4px;
-  object-fit: contain;
-}
-
-.tab__icon-fallback {
-  width: 20px;
-  height: 20px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--aidesk-bg-3);
-  color: var(--aidesk-fg-2);
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 600;
-}
-
 .tab--loading::after {
   content: "";
   width: 6px;
   height: 6px;
-  border-radius: 50%;
+  border-radius: 9999px;
   background: currentColor;
-  animation: pulse 1s ease-in-out infinite;
-}
-
-.tab--error {
-  color: var(--aidesk-danger-fg);
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 0.3; }
-  50% { opacity: 1; }
+  margin-left: auto;
+  animation: tab-pulse 1s ease-in-out infinite;
 }
 </style>

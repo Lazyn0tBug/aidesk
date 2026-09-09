@@ -36,13 +36,11 @@ const overlayState = computed<"loading" | "error" | null>(() => {
 
 let resizeObserver: ResizeObserver | null = null;
 const onResize = () => {
-  const tabBar = document.querySelector<HTMLElement>(".tab-bar");
-  const draftBox = document.querySelector<HTMLElement>(".draft-box");
-  const w = window.innerWidth;
-  const h = window.innerHeight;
+  const tabBar = document.querySelector<HTMLElement>(".tab-bar") ?? document.querySelector("header");
+  const draftBox = document.querySelector<HTMLElement>(".draft-box") ?? document.querySelector("section");
   const bounds = calculateWebViewBounds({
-    windowWidth: w,
-    windowHeight: h,
+    windowWidth: window.innerWidth,
+    windowHeight: window.innerHeight,
     tabBarHeight: tabBar?.getBoundingClientRect().height ?? 0,
     draftBoxHeight: draftBox?.getBoundingClientRect().height ?? 0,
   });
@@ -63,9 +61,9 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <main class="webview-area">
+  <main class="relative flex-1 min-h-0 overflow-hidden bg-surface">
     <template v-if="provider">
-      <div v-if="overlayState" class="webview-area__overlay-wrap">
+      <div v-if="overlayState" class="absolute inset-0">
         <StatusOverlay
           :state="overlayState"
           :provider="provider"
@@ -73,90 +71,20 @@ onUnmounted(() => {
           @reload="emit('reload', provider.id)"
         />
       </div>
-      <div v-else class="webview-area__placeholder">
-        <div class="webview-area__card">
+      <div v-else class="absolute inset-0 flex items-center justify-center">
+        <div class="flex flex-col items-center gap-2 px-8 py-6 rounded-xl border border-line bg-surface-2">
           <img
             v-if="resolveIcon(provider.iconKey)"
-            class="webview-area__icon"
             :src="resolveIcon(provider.iconKey)!.src"
             :alt="provider.name"
+            class="size-12 rounded-lg"
           />
-          <h2 class="webview-area__title">{{ provider.name }}</h2>
-          <p class="webview-area__url">{{ provider.url }}</p>
-          <p class="webview-area__hint">
-            Phase 2: this surface will host a Tauri WebviewWindow.
-          </p>
+          <h2 class="m-0 text-lg">{{ provider.name }}</h2>
+          <p class="m-0 text-ink-2 text-[13px] break-all">{{ provider.url }}</p>
+          <p class="mt-1 mb-0 text-ink-2 text-[11px]">Phase 2: this surface will host a Tauri WebviewWindow.</p>
         </div>
       </div>
     </template>
-    <div v-else class="webview-area__empty">No provider available</div>
+    <div v-else class="absolute inset-0 flex items-center justify-center text-ink-2">No provider available</div>
   </main>
 </template>
-
-<style scoped>
-.webview-area {
-  position: relative;
-  flex: 1 1 auto;
-  background: var(--aidesk-bg-1);
-  overflow: hidden;
-  min-height: 0;
-}
-
-.webview-area__overlay-wrap {
-  position: absolute;
-  inset: 0;
-}
-
-.webview-area__placeholder {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.webview-area__card {
-  text-align: center;
-  padding: 24px 32px;
-  border-radius: 12px;
-  background: var(--aidesk-bg-2);
-  border: 1px solid var(--aidesk-border);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-}
-
-.webview-area__icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 8px;
-}
-
-.webview-area__title {
-  margin: 0;
-  font-size: 18px;
-}
-
-.webview-area__url {
-  margin: 0;
-  color: var(--aidesk-fg-2);
-  font-size: 13px;
-  word-break: break-all;
-}
-
-.webview-area__hint {
-  margin: 4px 0 0;
-  color: var(--aidesk-fg-2);
-  font-size: 11px;
-}
-
-.webview-area__empty {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--aidesk-fg-2);
-}
-</style>
