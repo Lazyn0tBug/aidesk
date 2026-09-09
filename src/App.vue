@@ -17,6 +17,7 @@ import {
   useAppStore,
 } from "./stores/appStore";
 import { bindToastConfig, pushToast } from "./utils/toast";
+import { calculateWebViewBounds } from "./utils/bounds";
 import { getAppConfig, getLastActiveProvider } from "./ipc";
 import { copyText } from "./ipc/clipboard";
 import type { Bounds, ProviderId } from "./types";
@@ -65,14 +66,14 @@ const messages = computed(() => {
 function boundsForSwitch(): Bounds {
   // Use the last measured bounds if available; fall back to a full-window
   // rectangle sized to the current window so the first show still has
-  // something sensible.
+  // something sensible. Routes through `calculateWebViewBounds` so the
+  // integer-pixel rounding (matches the Rust `Bounds` wire type) lives
+  // in one place.
   if (lastBounds.value) return lastBounds.value;
-  return {
-    x: 0,
-    y: 0,
-    width: window.innerWidth,
-    height: window.innerHeight,
-  };
+  return calculateWebViewBounds({
+    windowWidth: window.innerWidth,
+    windowHeight: window.innerHeight,
+  });
 }
 
 async function onSelectTab(id: ProviderId) {

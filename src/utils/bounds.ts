@@ -21,6 +21,12 @@ export interface WebViewAreaInputs {
  *
  * Defaults to `{ x: 0, y: 0, width: windowWidth, height: windowHeight }`
  * when the header regions are not yet measured.
+ *
+ * All four fields are rounded to integer pixels. The Rust wire type
+ * (`Bounds` in `webview_manager.rs`) declares `width`/`height` as `u32`,
+ * and serde_json rejects fractional values with "expected u32". DOM
+ * measurements (`getBoundingClientRect`) routinely return subpixel
+ * floats on HiDPI displays, so rounding must happen at the producer.
  */
 export function calculateWebViewBounds(
   input: Partial<WebViewAreaInputs> & { windowWidth: number; windowHeight: number },
@@ -32,8 +38,8 @@ export function calculateWebViewBounds(
   const y = tabBarHeight + draftBoxHeight;
   return {
     x: 0,
-    y,
-    width: Math.max(0, windowWidth),
-    height: Math.max(0, windowHeight - y),
+    y: Math.round(y),
+    width: Math.max(0, Math.round(windowWidth)),
+    height: Math.max(0, Math.round(windowHeight - y)),
   };
 }
