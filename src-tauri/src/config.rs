@@ -307,6 +307,7 @@ fn default_shortcuts_section() -> ShortcutsSection {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[derive(Default)]
 pub struct FutureSection {
     pub auto_focus_input: bool,
     pub auto_fill_input: bool,
@@ -316,18 +317,6 @@ pub struct FutureSection {
     pub answer_relay: bool,
 }
 
-impl Default for FutureSection {
-    fn default() -> Self {
-        Self {
-            auto_focus_input: false,
-            auto_fill_input: false,
-            auto_submit: false,
-            sidebar: false,
-            prompt_templates: false,
-            answer_relay: false,
-        }
-    }
-}
 
 fn default_future_section() -> FutureSection {
     FutureSection::default()
