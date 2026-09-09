@@ -289,10 +289,21 @@ before the change is considered complete.
 - [x] Phase 2: Tab + WebView lifecycle
 - [x] Phase 3: DraftBox + clipboard
 - [x] Phase 4: State + error overlay + retry
-- [ ] Phase 5: Acceptance
+- [x] Phase 5: Acceptance (see `docs/acceptance.md` for the §21 mapping)
 
 Each phase ships behind a single commit and verifies against the matching
 §21 acceptance list before moving on.
+
+### Phase 5 notes
+
+- The full §21 checklist is in `docs/acceptance.md`. 29 of 34 bullets
+  have static evidence (test name or file:line). The remaining 5 need
+  `bun run tauri dev` and a live webview.
+- Manual test script (also in the doc): launch the app, type into the
+  draft box, switch tabs, log in to a provider, switch back, scroll,
+  click an outbound link.
+- No code changes ship in Phase 5 by design; only the verification
+  artifact + this status row.
 
 ### Phase 2 notes
 
