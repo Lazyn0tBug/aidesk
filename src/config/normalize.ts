@@ -22,7 +22,7 @@ const DEFAULT_TAB_BAR: TabBarConfig = {
 };
 
 const DEFAULT_DRAFT_BOX: DraftBoxConfig = {
-  enabled: true,
+  enabled: false,
   placeholder: "输入你想问的问题",
   copyOnSwitch: true,
   clearAfterCopy: false,

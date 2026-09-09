@@ -51,9 +51,21 @@ onMounted(() => {
   window.addEventListener("resize", onResize);
   resizeObserver = new ResizeObserver(onResize);
   resizeObserver.observe(document.body);
-  // Force one emission so the parent gets the initial bounds even if
-  // ResizeObserver's first tick is delayed.
-  onResize();
+  // Also watch the tab bar itself — if the parent's size doesn't
+  // change but the tab bar's height changes (e.g. CSS finishes
+  // applying after the synchronous layout pass), we still want to
+  // re-measure. Without this, the first `getBoundingClientRect()`
+  // can read the buttons' natural height (~4-8px) before `h-11` is
+  // applied, leaving the qwen webview anchored too high and covering
+  // most of the header.
+  const tabBarEl = document.querySelector<HTMLElement>("[data-tabbar]");
+  if (tabBarEl) resizeObserver.observe(tabBarEl);
+  // Defer the first emission to the next animation frame so the
+  // browser has finished layout + style application. `getBoundingClientRect`
+  // forces sync layout, but if it's called before the tab bar's
+  // styles have been computed (rare on a hot reload, common on first
+  // mount), it returns the unstyled natural height.
+  requestAnimationFrame(onResize);
 });
 
 onUnmounted(() => {

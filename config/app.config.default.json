@@ -58,7 +58,7 @@
       "iconOnly": false
     },
     "draftBox": {
-      "enabled": true,
+      "enabled": false,
       "placeholder": "输入你想问的问题，点击 AI 后粘贴即可",
       "copyOnSwitch": true,
       "clearAfterCopy": false,

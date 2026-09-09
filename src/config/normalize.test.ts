@@ -35,7 +35,9 @@ describe("normalizeTabBar (design §7.6)", () => {
 describe("normalizeDraftBox", () => {
   it("applies expected defaults", () => {
     const r = normalizeDraftBox(undefined);
-    expect(r.enabled).toBe(true);
+    // DraftBox is hidden by default — per design, the unified prompt
+    // box is opt-in via `ui.draftBox.enabled = true`.
+    expect(r.enabled).toBe(false);
     expect(r.copyOnSwitch).toBe(true);
     expect(r.clearAfterCopy).toBe(false);
     expect(r.maxLines).toBe(6);

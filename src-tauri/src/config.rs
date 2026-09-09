@@ -182,7 +182,7 @@ pub struct DraftBoxConfig {
 impl Default for DraftBoxConfig {
     fn default() -> Self {
         Self {
-            enabled: true,
+            enabled: false,
             placeholder: "输入你想问的问题".into(),
             copy_on_switch: true,
             clear_after_copy: false,
