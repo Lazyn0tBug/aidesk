@@ -38,6 +38,24 @@
       "enabled": true,
       "shortcut": "CmdOrCtrl+3",
       "allowedHosts": ["claude.ai"]
+    },
+    {
+      "id": "gemini",
+      "name": "Gemini",
+      "iconKey": "gemini",
+      "url": "https://gemini.google.com/",
+      "enabled": true,
+      "shortcut": "CmdOrCtrl+4",
+      "allowedHosts": ["gemini.google.com"]
+    },
+    {
+      "id": "grok",
+      "name": "Grok",
+      "iconKey": "grok",
+      "url": "https://grok.com/",
+      "enabled": true,
+      "shortcut": "CmdOrCtrl+5",
+      "allowedHosts": ["grok.com", "x.com"]
     }
   ],
   "defaultProvider": {
@@ -78,7 +96,10 @@
     "globalAllowedHosts": [
       "chat.qwen.ai",
       "chatgpt.com",
-      "claude.ai"
+      "claude.ai",
+      "gemini.google.com",
+      "grok.com",
+      "x.com"
     ]
   },
   "messages": {
