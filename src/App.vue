@@ -106,7 +106,20 @@ async function performCopyAndMaybeClear() {
 }
 
 function onSubmitDraft() {
-  void performCopyAndMaybeClear();
+  void onSubmitFromDraft();
+}
+
+async function onSubmitFromDraft() {
+  // Design §15.3: Enter on the draft box copies the draft and "switches"
+  // to the currently active provider. Switching to the active provider
+  // is a no-op at the IPC level (the same webview is shown), but the
+  // call also re-asserts bounds and gives the user a fresh focus on
+  // the active webview (added in Phase 4 if needed).
+  await performCopyAndMaybeClear();
+  const id = store.activeProviderId;
+  if (id) {
+    await switchProvider(id, boundsForSwitch());
+  }
 }
 
 async function onReload(id: string) {

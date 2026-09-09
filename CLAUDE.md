@@ -74,7 +74,7 @@ Rust (`src-tauri/src/`):
 | `providers.rs` | filter enabled, lookup, whitelist computation | §13.4, §16 |
 | `webview_manager.rs` | per-provider WebView lifecycle; creates child `WebviewWindow`s via `WebviewWindowBuilder::parent("main")`, gates navigation through `on_navigation` whitelist | §13.5, §4.3, §4.6 |
 | `navigation.rs` | navigation whitelist check + external browser | §13.6, §4.6 |
-| `clipboard.rs` | write system clipboard (Phase 3 stub) | §13.7, §4.5 |
+| `clipboard.rs` | write-only clipboard service via `arboard`; never reads | §13.7, §4.5 |
 | `commands.rs` | Tauri command handlers + unified error format | §13.8, §12, §17 |
 
 Frontend (`src/`):
@@ -287,7 +287,7 @@ before the change is considered complete.
 
 - [x] Phase 1: Config system (this scaffold)
 - [x] Phase 2: Tab + WebView lifecycle
-- [ ] Phase 3: DraftBox + clipboard
+- [x] Phase 3: DraftBox + clipboard
 - [ ] Phase 4: State + error overlay + retry
 - [ ] Phase 5: Acceptance
 
@@ -313,3 +313,20 @@ Each phase ships behind a single commit and verifies against the matching
   inside `show_provider_webview`: it hides the previously-visible
   provider in the same call rather than requiring a separate
   `hide_all` round-trip.
+
+### Phase 3 notes
+
+- Clipboard write uses the `arboard` crate, not `tauri-plugin-clipboard-manager`.
+  The plugin is the right answer when the *frontend* needs to call
+  clipboard ops, but our write path is driven by a Rust command
+  (design §4.5 #1). `arboard` keeps the write entirely server-controlled
+  and avoids the plugin's frontend capability surface.
+- The `ClipboardService` API only exposes `write`; no `read` method is
+  defined. The design forbids reading the clipboard (§4.5 #2, §21.5 #3);
+  keeping it out of the type system prevents future drift.
+- A fresh `arboard::Clipboard` handle is constructed per write. This
+  is cheap on macOS/Linux and sidesteps the Windows lifetime quirk
+  where a clipboard handle must outlive its writes.
+- DraftBox Enter (§15.3) copies + calls `switchProvider(active_id, bounds)`.
+  The switch is effectively a no-op when already on the active tab
+  but it re-asserts bounds and gives Phase 4 a hook for webview focus.
