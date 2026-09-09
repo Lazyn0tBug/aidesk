@@ -1,0 +1,38 @@
+// §12.3 webview commands. Bodies in `webview_manager.rs` are stubs that
+// error with "Phase 2 not yet implemented" until Phase 2 lands; calling
+// these will reject the returned promise.
+import { invoke } from "@tauri-apps/api/core";
+import type { Bounds, ProviderId } from "../types";
+
+export function createProviderWebview(
+  providerId: ProviderId,
+  bounds: Bounds,
+): Promise<void> {
+  return invoke<void>("create_provider_webview", { providerId, bounds });
+}
+
+export function showProviderWebview(
+  providerId: ProviderId,
+  bounds: Bounds,
+): Promise<void> {
+  return invoke<void>("show_provider_webview", { providerId, bounds });
+}
+
+export function hideProviderWebview(providerId: ProviderId): Promise<void> {
+  return invoke<void>("hide_provider_webview", { providerId });
+}
+
+export function hideAllProviderWebviews(): Promise<void> {
+  return invoke<void>("hide_all_provider_webviews");
+}
+
+export function setProviderWebviewBounds(
+  providerId: ProviderId,
+  bounds: Bounds,
+): Promise<void> {
+  return invoke<void>("set_provider_webview_bounds", { providerId, bounds });
+}
+
+export function reloadProviderWebview(providerId: ProviderId): Promise<void> {
+  return invoke<void>("reload_provider_webview", { providerId });
+}

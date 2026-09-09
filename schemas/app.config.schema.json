@@ -1,0 +1,182 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AIDesk AppConfig",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "providers",
+    "defaultProvider",
+    "webview",
+    "ui",
+    "security"
+  ],
+  "properties": {
+    "app": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string"
+        },
+        "window": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "title": { "type": "string" },
+            "width": { "type": "number", "minimum": 600 },
+            "height": { "type": "number", "minimum": 400 },
+            "minWidth": { "type": "number", "minimum": 600 },
+            "minHeight": { "type": "number", "minimum": 400 },
+            "rememberLastProvider": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "providers": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "iconKey", "url", "enabled"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-_]{1,63}$"
+          },
+          "name": { "type": "string", "minLength": 1 },
+          "iconKey": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-_]{1,63}$"
+          },
+          "url": {
+            "type": "string",
+            "pattern": "^https://"
+          },
+          "enabled": { "type": "boolean" },
+          "shortcut": { "type": "string" },
+          "allowedHosts": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z0-9.-]+(:[0-9]+)?$"
+            }
+          }
+        }
+      }
+    },
+    "defaultProvider": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "active": { "type": "string" },
+        "fallbackToFirstEnabled": { "type": "boolean" }
+      }
+    },
+    "webview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lazyLoad", "keepAlive"],
+      "properties": {
+        "lazyLoad": { "type": "boolean" },
+        "keepAlive": { "type": "boolean" },
+        "maxActiveWebviews": { "type": "number", "minimum": 1, "maximum": 10 },
+        "reloadOnFail": { "type": "boolean" }
+      }
+    },
+    "ui": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tabBar", "draftBox"],
+      "properties": {
+        "tabBar": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "position": { "type": "string", "enum": ["top"] },
+            "showIcon": { "type": "boolean" },
+            "showName": { "type": "boolean" },
+            "iconOnly": { "type": "boolean" }
+          }
+        },
+        "draftBox": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "placeholder": { "type": "string" },
+            "copyOnSwitch": { "type": "boolean" },
+            "clearAfterCopy": { "type": "boolean" },
+            "maxLines": { "type": "number", "minimum": 1, "maximum": 12 }
+          }
+        },
+        "toast": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "durationMs": { "type": "number", "minimum": 1000, "maximum": 10000 }
+          }
+        },
+        "toolbar": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "position": { "type": "string", "enum": ["left", "right"] }
+          }
+        }
+      }
+    },
+    "security": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allowUnknownNavigation", "openExternalInSystemBrowser", "globalAllowedHosts"],
+      "properties": {
+        "allowUnknownNavigation": { "type": "boolean" },
+        "openExternalInSystemBrowser": { "type": "boolean" },
+        "globalAllowedHosts": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9.-]+(:[0-9]+)?$"
+          }
+        }
+      }
+    },
+    "messages": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "loading": { "type": "string" },
+        "loadFailed": { "type": "string" },
+        "copied": { "type": "string" },
+        "copyFailed": { "type": "string" },
+        "reload": { "type": "string" }
+      }
+    },
+    "shortcuts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "focusDraftBox": { "type": "string" },
+        "switchProviderPrefix": { "type": "string" }
+      }
+    },
+    "future": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "autoFocusInput": { "type": "boolean" },
+        "autoFillInput": { "type": "boolean" },
+        "autoSubmit": { "type": "boolean" },
+        "sidebar": { "type": "boolean" },
+        "promptTemplates": { "type": "boolean" },
+        "answerRelay": { "type": "boolean" }
+      }
+    }
+  }
+}

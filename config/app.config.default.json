@@ -1,0 +1,103 @@
+{
+  "app": {
+    "name": "AIDesk",
+    "version": "0.1.0",
+    "window": {
+      "title": "AIDesk",
+      "width": 1280,
+      "height": 800,
+      "minWidth": 900,
+      "minHeight": 600,
+      "rememberLastProvider": true
+    }
+  },
+  "providers": [
+    {
+      "id": "qwen",
+      "name": "Qwen",
+      "iconKey": "qwen",
+      "url": "https://chat.qwen.ai/",
+      "enabled": true,
+      "shortcut": "CmdOrCtrl+1",
+      "allowedHosts": ["chat.qwen.ai"]
+    },
+    {
+      "id": "chatgpt",
+      "name": "ChatGPT",
+      "iconKey": "chatgpt",
+      "url": "https://chatgpt.com/",
+      "enabled": true,
+      "shortcut": "CmdOrCtrl+2",
+      "allowedHosts": ["chatgpt.com"]
+    },
+    {
+      "id": "claude",
+      "name": "Claude",
+      "iconKey": "claude",
+      "url": "https://claude.ai/",
+      "enabled": true,
+      "shortcut": "CmdOrCtrl+3",
+      "allowedHosts": ["claude.ai"]
+    }
+  ],
+  "defaultProvider": {
+    "active": "qwen",
+    "fallbackToFirstEnabled": true
+  },
+  "webview": {
+    "lazyLoad": true,
+    "keepAlive": true,
+    "maxActiveWebviews": 5,
+    "reloadOnFail": true
+  },
+  "ui": {
+    "tabBar": {
+      "position": "top",
+      "showIcon": true,
+      "showName": true,
+      "iconOnly": false
+    },
+    "draftBox": {
+      "enabled": true,
+      "placeholder": "输入你想问的问题，点击 AI 后粘贴即可",
+      "copyOnSwitch": true,
+      "clearAfterCopy": false,
+      "maxLines": 6
+    },
+    "toast": {
+      "durationMs": 2500
+    },
+    "toolbar": {
+      "enabled": false,
+      "position": "right"
+    }
+  },
+  "security": {
+    "allowUnknownNavigation": false,
+    "openExternalInSystemBrowser": true,
+    "globalAllowedHosts": [
+      "chat.qwen.ai",
+      "chatgpt.com",
+      "claude.ai"
+    ]
+  },
+  "messages": {
+    "loading": "正在打开 {provider}...",
+    "loadFailed": "页面加载失败",
+    "copied": "已复制，粘贴即可发送",
+    "copyFailed": "复制失败，请手动复制",
+    "reload": "重新加载"
+  },
+  "shortcuts": {
+    "focusDraftBox": "CmdOrCtrl+K",
+    "switchProviderPrefix": "CmdOrCtrl"
+  },
+  "future": {
+    "autoFocusInput": false,
+    "autoFillInput": false,
+    "autoSubmit": false,
+    "sidebar": false,
+    "promptTemplates": false,
+    "answerRelay": false
+  }
+}
