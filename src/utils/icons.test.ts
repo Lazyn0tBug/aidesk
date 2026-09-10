@@ -1,7 +1,14 @@
-// §14.4 icon resolution + fallback label helper.
+// §14.4 icon resolution + per-provider brand palette + fallback label.
 
 import { describe, expect, it } from "vitest";
-import { iconFallbackLabel, resolveIcon } from "./icons";
+import {
+  BADGE_BG,
+  BADGE_TEXT,
+  iconBrandBg,
+  iconBrandFg,
+  iconFallbackLabel,
+  resolveIcon,
+} from "./icons";
 
 describe("resolveIcon", () => {
   it("resolves a valid iconKey to a public path", () => {
@@ -34,18 +41,38 @@ describe("resolveIcon", () => {
 });
 
 describe("iconFallbackLabel", () => {
-  it("returns the first letter uppercased for Latin names", () => {
-    expect(iconFallbackLabel("Qwen")).toBe("Q");
-    expect(iconFallbackLabel("chatgpt")).toBe("C");
+  it("returns the per-provider 2-char label when known", () => {
+    expect(iconFallbackLabel("qwen")).toBe("Qw");
+    expect(iconFallbackLabel("chatgpt")).toBe("GP");
+    expect(iconFallbackLabel("claude")).toBe("Cl");
+    expect(iconFallbackLabel("gemini")).toBe("Gm");
+    expect(iconFallbackLabel("grok")).toBe("Gk");
   });
 
-  it("returns the first character for CJK names", () => {
-    expect(iconFallbackLabel("通义千问")).toBe("通");
-    expect(iconFallbackLabel("克劳德")).toBe("克");
+  it("returns no duplicate first-letters across shipped providers", () => {
+    const labels = Object.keys(BADGE_TEXT).map((k) => iconFallbackLabel(k));
+    expect(new Set(labels).size).toBe(labels.length);
   });
 
-  it("returns ? for empty input", () => {
-    expect(iconFallbackLabel("")).toBe("?");
-    expect(iconFallbackLabel("   ")).toBe("?");
+  it("falls back to first 2 chars of iconKey for unknown providers", () => {
+    expect(iconFallbackLabel("my-provider")).toBe("MY");
+    expect(iconFallbackLabel("custom_ai")).toBe("CU");
+  });
+
+  it("handles unknown single-char keys without crashing", () => {
+    // slice(0,2) returns the whole string for length-1 inputs.
+    expect(iconFallbackLabel("a")).toBe("A");
+  });
+});
+
+describe("iconBrandBg / iconBrandFg", () => {
+  it("returns the per-provider brand color", () => {
+    expect(iconBrandBg("qwen")).toBe(BADGE_BG.qwen);
+    expect(iconBrandBg("claude")).toBe(BADGE_BG.claude);
+  });
+
+  it("falls back to a neutral CSS variable for unknown providers", () => {
+    expect(iconBrandBg("never-seen")).toContain("--color-surface-3");
+    expect(iconBrandFg("never-seen")).toContain("--color-ink");
   });
 });

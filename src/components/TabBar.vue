@@ -5,7 +5,12 @@
 import { computed } from "vue";
 import { useAppStore } from "../stores/appStore";
 import type { ProviderConfig, ProviderId, TabBarConfig } from "../types";
-import { resolveIcon, iconFallbackLabel } from "../utils/icons";
+import {
+  resolveIcon,
+  iconBrandBg,
+  iconBrandFg,
+  iconFallbackLabel,
+} from "../utils/icons";
 
 const props = defineProps<{
   config: TabBarConfig;
@@ -56,18 +61,22 @@ const onClick = (id: ProviderId) => {
       ]"
       @click="onClick(tab.id)"
     >
-      <span v-if="showIconFor(tab)" class="size-5 inline-flex items-center justify-center" aria-hidden="true">
+      <span v-if="showIconFor(tab)" class="relative size-5 inline-flex items-center justify-center rounded overflow-hidden text-[11px] font-semibold leading-none" :style="{ backgroundColor: iconBrandBg(tab.iconKey), color: iconBrandFg(tab.iconKey) }" aria-hidden="true">
+        <!--
+          Real icon (PNG dropped into public/icons/{iconKey}.png)
+          layered on top. If the file 404s the @error handler hides it
+          and the badge text below shows through. This is more robust
+          than the previous v-if/v-else setup, which never took the
+          fallback path because resolveIcon() always returned non-null.
+        -->
         <img
           v-if="resolveIcon(tab.iconKey)"
           :src="resolveIcon(tab.iconKey)!.src"
           :alt="''"
-          class="size-5 rounded object-contain"
+          class="absolute inset-0 size-full object-contain"
           @error="($event.target as HTMLImageElement).style.display = 'none'"
         />
-        <span
-          v-else
-          class="size-5 inline-flex items-center justify-center rounded bg-surface-3 text-ink-2 text-[11px] font-semibold"
-        >{{ iconFallbackLabel(tab.name) }}</span>
+        <span>{{ iconFallbackLabel(tab.iconKey) }}</span>
       </span>
       <span v-if="showNameFor(tab)">{{ tab.name }}</span>
     </button>
