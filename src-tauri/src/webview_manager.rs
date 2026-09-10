@@ -565,4 +565,13 @@ mod tests {
         assert!(snap.entries.is_empty());
         assert!(snap.visible.is_none());
     }
+
+    #[test]
+    fn toast_label_is_static() {
+        // Reserved label for the toast overlay webview. Distinct
+        // from any provider- prefix so the lookup helpers don't
+        // accidentally treat it as a provider.
+        assert_eq!(toast_label(), "toast");
+        assert!(!toast_label().starts_with("provider-"));
+    }
 }

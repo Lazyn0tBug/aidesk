@@ -18,6 +18,7 @@ import {
 } from "./stores/appStore";
 import { bindToastConfig, pushToast } from "./utils/toast";
 import { calculateWebViewBounds } from "./utils/bounds";
+import { matchesProviderHost, providerHost } from "./utils/provider";
 import {
   attachToastOverlay,
   copyText,
@@ -185,27 +186,15 @@ async function returnToProviderHome(id: ProviderId): Promise<void> {
   const provider = store.enabledProviders.find((p) => p.id === id);
   if (!provider) return;
 
-  const targetHost = (() => {
-    try {
-      return new URL(provider.url).host;
-    } catch {
-      return null;
-    }
-  })();
+  const targetHost = providerHost(provider.url);
   if (!targetHost) return;
 
   const currentHost = await webviewUrl(id)
-    .then((u) => {
-      try {
-        return u ? new URL(u).host : null;
-      } catch {
-        return null;
-      }
-    })
+    .then((u) => providerHost(u))
     .catch(() => null);
 
   // Already on the provider — nothing to do.
-  if (currentHost === targetHost) return;
+  if (matchesProviderHost(currentHost, provider.url)) return;
 
   // Try history.back() once. We don't loop because each back() can
   // cross an off-provider redirect (e.g. OAuth bounce), and one step
@@ -217,16 +206,10 @@ async function returnToProviderHome(id: ProviderId): Promise<void> {
   // completion, so we need a small delay to let the new URL commit.
   await new Promise((r) => setTimeout(r, 300));
   const afterBackHost = await webviewUrl(id)
-    .then((u) => {
-      try {
-        return u ? new URL(u).host : null;
-      } catch {
-        return null;
-      }
-    })
+    .then((u) => providerHost(u))
     .catch(() => null);
 
-  if (afterBackHost === targetHost) return;
+  if (matchesProviderHost(afterBackHost, provider.url)) return;
 
   // History exhausted or didn't bring us home — force-replace with
   // the provider's URL. JSON.stringify escapes the URL safely for

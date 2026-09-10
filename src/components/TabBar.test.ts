@@ -73,4 +73,28 @@ describe("TabBar.vue", () => {
     const tabs = wrapper.findAll('[role="tab"]');
     expect(tabs[0]?.classes()).toContain("tab--loading");
   });
+
+  it("renders the fallback badge with the per-provider label", () => {
+    // public/icons/ has only README.md, so the badge is always what
+    // the user sees. The 2-char label is what makes tabs distinct
+    // when no real icon has shipped — see icons.ts BADGE_TEXT.
+    hydrateStore(sampleConfig(), "qwen");
+    const wrapper = mount(TabBar, {
+      props: { config: useAppStore().config!.ui.tabBar },
+    });
+    const tab = wrapper.findAll('[role="tab"]')[0];
+    expect(tab?.text()).toContain("Qw");
+  });
+
+  it("applies the per-provider brand color to the badge", () => {
+    // The badge background is brand-specific (Alibaba orange for
+    // qwen). The inline :style binding reads from iconBrandBg.
+    hydrateStore(sampleConfig(), "qwen");
+    const wrapper = mount(TabBar, {
+      props: { config: useAppStore().config!.ui.tabBar },
+    });
+    const badge = wrapper.findAll('[role="tab"] [aria-hidden="true"]')[0];
+    // The style attribute serializes RGB — match the rgb form.
+    expect(badge?.attributes("style")).toContain("background-color: rgb(255, 106, 0)");
+  });
 });
