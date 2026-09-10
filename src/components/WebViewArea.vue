@@ -13,10 +13,10 @@
 // webview's content area.
 
 import { computed, onMounted, onUnmounted } from "vue";
-import { activeProvider, activeWebview, useAppStore } from "../stores/appStore";
+import { activeProvider, activeWebview } from "../stores/appStore";
 import { resolveIcon } from "../utils/icons";
 import { calculateWebViewBounds } from "../utils/bounds";
-import { webviewBack, webviewExit, webviewForward, webviewRefresh } from "../ipc";
+import { webviewBack, webviewForward, webviewRefresh, exitApp } from "../ipc";
 import type { Bounds, MessagesSection, ProviderConfig } from "../types";
 import StatusOverlay from "./StatusOverlay.vue";
 
@@ -30,7 +30,6 @@ const emit = defineEmits<{
   (e: "bounds", b: Bounds): void;
 }>();
 
-const store = useAppStore();
 const webview = computed(() => activeWebview.value);
 
 const overlayState = computed<"loading" | "error" | null>(() => {
@@ -65,7 +64,7 @@ function onExit() {
   // No confirmation dialog — browser-style immediate exit. The
   // exit button is styled with danger colors on hover so the
   // destructive nature is visually obvious before the user clicks.
-  webviewExit().catch(() => {});
+  exitApp().catch(() => {});
 }
 
 let resizeObserver: ResizeObserver | null = null;

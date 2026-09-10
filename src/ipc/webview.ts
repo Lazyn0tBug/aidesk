@@ -79,3 +79,17 @@ export function webviewUrl(providerId: ProviderId): Promise<string> {
 export function exitApp(): Promise<void> {
   return invoke<void>("exit_app");
 }
+
+/**
+ * Run an arbitrary JS expression in the active provider's webview.
+ * Used by App.vue's return-to-home flow to call `location.replace(...)`
+ * after `history.back()` doesn't reach the provider's host.
+ *
+ * The only callers are internal (return-toProviderHome). We don't
+ * expose this to arbitrary user input — IPC eval is a wide attack
+ * surface (any JS runs in the webview's context with full origin
+ * cookies). Add new callers carefully and validate the `js` string.
+ */
+export function webviewEval(providerId: ProviderId, js: string): Promise<void> {
+  return invoke<void>("eval_provider_webview", { providerId, js });
+}
