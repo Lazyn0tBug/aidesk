@@ -103,7 +103,12 @@
       "accounts.google.com",
       "anthropic.com",
       "auth.openai.com",
-      "aliyun.com"
+      "aliyun.com",
+      "twitter.com",
+      "twimg.com",
+      "openai.com",
+      "gstatic.com",
+      "googleapis.com"
     ]
   },
   "messages": {
