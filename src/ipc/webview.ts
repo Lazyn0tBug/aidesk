@@ -69,3 +69,13 @@ export function webviewRefresh(providerId: ProviderId): Promise<void> {
 export function webviewUrl(providerId: ProviderId): Promise<string> {
   return invoke<string>("webview_url", { providerId });
 }
+
+/**
+ * Quit the application. The Rust side calls `app.exit(0)` which is
+ * the same thing as closing the main window — the OS kills the
+ * process. Synchronous from the user's perspective (window goes
+ * away); the IPC promise resolves after the exit has been initiated.
+ */
+export function exitApp(): Promise<void> {
+  return invoke<void>("exit_app");
+}

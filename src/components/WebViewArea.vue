@@ -16,7 +16,7 @@ import { computed, onMounted, onUnmounted } from "vue";
 import { activeProvider, activeWebview, useAppStore } from "../stores/appStore";
 import { resolveIcon } from "../utils/icons";
 import { calculateWebViewBounds } from "../utils/bounds";
-import { webviewBack, webviewForward, webviewRefresh } from "../ipc";
+import { webviewBack, webviewExit, webviewForward, webviewRefresh } from "../ipc";
 import type { Bounds, MessagesSection, ProviderConfig } from "../types";
 import StatusOverlay from "./StatusOverlay.vue";
 
@@ -59,6 +59,13 @@ function onForward() {
 function onRefresh() {
   const id = activeProvider.value?.id;
   if (id) webviewRefresh(id).catch(() => {});
+}
+
+function onExit() {
+  // No confirmation dialog — browser-style immediate exit. The
+  // exit button is styled with danger colors on hover so the
+  // destructive nature is visually obvious before the user clicks.
+  webviewExit().catch(() => {});
 }
 
 let resizeObserver: ResizeObserver | null = null;
@@ -147,6 +154,18 @@ onUnmounted(() => {
       >
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
           <path d="M13 8 a5 5 0 1 1 -1.5 -3.5 M13 2 V5 H10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+      <div class="mx-1 h-5 w-px bg-line pointer-events-none" aria-hidden="true" />
+      <button
+        type="button"
+        class="size-7 inline-flex items-center justify-center rounded-md text-ink-2 hover:bg-danger-soft hover:text-danger cursor-pointer transition-colors pointer-events-auto"
+        title="Exit AIDesk"
+        aria-label="Exit AIDesk"
+        @click="onExit"
+      >
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M4 4 L12 12 M12 4 L4 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
         </svg>
       </button>
     </div>

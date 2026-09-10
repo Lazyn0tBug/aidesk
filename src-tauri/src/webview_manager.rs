@@ -482,6 +482,16 @@ pub async fn webview_url<R: Runtime>(
         .map_err(|e| AppError::WebviewCreateFailed(format!("webview_url: {e}")))
 }
 
+/// Quit the AIDesk application. Wired to the exit button in the
+/// WebViewArea toolbar (the fourth "basic browser operation" — back /
+/// forward / refresh / exit). Exit code 0 = clean shutdown, which
+/// lets the OS distinguish from a crash if anything ever needs to
+/// script against us.
+#[tauri::command]
+pub fn exit_app<R: Runtime>(app: AppHandle<R>) {
+    app.exit(0);
+}
+
 /// Main window label — used as the parent for embedded provider webviews.
 pub fn main_window_label() -> &'static str {
     "main"
