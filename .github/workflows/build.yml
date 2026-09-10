@@ -60,11 +60,10 @@ jobs:
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
-        env:
-          # Unsigned build — leave these unset for now.
-          # APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          # APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          # APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        # Unsigned builds for now. To enable signing, re-add the
+        # `env:` block with APPLE_CERTIFICATE / APPLE_CERTIFICATE_PASSWORD
+        # / APPLE_SIGNING_IDENTITY secrets — GitHub's workflow validator
+        # rejects empty `env:` blocks containing only comments.
         with:
           args: --target ${{ matrix.runner == 'macos-latest' && 'aarch64-apple-darwin' || 'x86_64-apple-darwin' }}
 
@@ -109,9 +108,9 @@ jobs:
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
-        env:
-          # WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
-          # WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        # Unsigned builds for now. To enable signing, re-add the
+        # `env:` block with WINDOWS_CERTIFICATE /
+        # WINDOWS_CERTIFICATE_PASSWORD secrets.
         with:
           args: --target x86_64-pc-windows-msvc
 
