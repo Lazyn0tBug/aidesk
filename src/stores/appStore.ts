@@ -8,13 +8,7 @@
 // `store.switchProvider(id)` etc. — IPC details stay inside the store.
 
 import { computed, reactive } from "vue";
-import type {
-  AppConfig,
-  Bounds,
-  ProviderConfig,
-  ProviderId,
-  WebViewRuntimeState,
-} from "../types";
+import type { AppConfig, Bounds, ProviderConfig, ProviderId, WebViewRuntimeState } from "../types";
 import { normalizeAppConfig } from "../config/normalize";
 import {
   createProviderWebview,

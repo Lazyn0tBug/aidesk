@@ -5,12 +5,7 @@
 import { computed } from "vue";
 import { useAppStore } from "../stores/appStore";
 import type { ProviderConfig, ProviderId, TabBarConfig } from "../types";
-import {
-  resolveIcon,
-  iconBrandBg,
-  iconBrandFg,
-  iconFallbackLabel,
-} from "../utils/icons";
+import { resolveIcon, iconBrandBg, iconBrandFg, iconFallbackLabel } from "../utils/icons";
 
 const props = defineProps<{
   config: TabBarConfig;
@@ -61,7 +56,12 @@ const onClick = (id: ProviderId) => {
       ]"
       @click="onClick(tab.id)"
     >
-      <span v-if="showIconFor(tab)" class="relative size-5 inline-flex items-center justify-center rounded overflow-hidden text-[11px] font-semibold leading-none" :style="{ backgroundColor: iconBrandBg(tab.iconKey), color: iconBrandFg(tab.iconKey) }" aria-hidden="true">
+      <span
+        v-if="showIconFor(tab)"
+        class="relative size-5 inline-flex items-center justify-center rounded overflow-hidden text-[11px] font-semibold leading-none"
+        :style="{ backgroundColor: iconBrandBg(tab.iconKey), color: iconBrandFg(tab.iconKey) }"
+        aria-hidden="true"
+      >
         <!--
           Real icon (PNG dropped into public/icons/{iconKey}.png)
           layered on top. If the file 404s the @error handler hides it
@@ -85,8 +85,13 @@ const onClick = (id: ProviderId) => {
 
 <style scoped>
 @keyframes tab-pulse {
-  0%, 100% { opacity: 0.3; }
-  50% { opacity: 1; }
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 .tab--loading::after {
   content: "";

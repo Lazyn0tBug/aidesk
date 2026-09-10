@@ -93,10 +93,7 @@ async function preloadOtherProviders(bounds: Bounds): Promise<void> {
 
 onMounted(async () => {
   try {
-    const [config, lastActive] = await Promise.all([
-      getAppConfig(),
-      getLastActiveProvider(),
-    ]);
+    const [config, lastActive] = await Promise.all([getAppConfig(), getLastActiveProvider()]);
     hydrateStore(config, lastActive);
     if (store.config?.ui.toast) bindToastConfig(store.config.ui.toast);
 
@@ -231,10 +228,7 @@ async function onSelectTab(id: ProviderId) {
 
   await switchProvider(id, boundsForSwitch());
 
-  if (
-    store.config.ui.draftBox.copyOnSwitch &&
-    store.draft.trim().length > 0
-  ) {
+  if (store.config.ui.draftBox.copyOnSwitch && store.draft.trim().length > 0) {
     await performCopyAndMaybeClear();
   }
 }

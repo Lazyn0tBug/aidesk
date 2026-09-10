@@ -16,7 +16,7 @@ const emit = defineEmits<{
 
 const value = computed<string>({
   get: () => useAppStore().draft,
-  set: (v: string) => useAppStore().draft = v,
+  set: (v: string) => (useAppStore().draft = v),
 });
 
 const rows = computed(() => Math.max(1, props.config.maxLines));
@@ -34,7 +34,13 @@ function onKeydown(e: KeyboardEvent) {
 </script>
 
 <template>
-  <section v-if="config.enabled" class="flex-none px-3 py-2 border-b border-line bg-surface-2" role="group" aria-label="Prompt draft" data-draftbox>
+  <section
+    v-if="config.enabled"
+    class="flex-none px-3 py-2 border-b border-line bg-surface-2"
+    role="group"
+    aria-label="Prompt draft"
+    data-draftbox
+  >
     <textarea
       class="w-full resize-y font-sans text-[14px] px-2.5 py-2 rounded-md border bg-surface text-ink outline-none transition-colors focus:border-accent"
       :placeholder="config.placeholder"

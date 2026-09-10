@@ -24,11 +24,11 @@ export interface ResolvedIcon {
  * would collide with naive monograms).
  */
 export const BADGE_BG: Readonly<Record<string, string>> = {
-  qwen: "#FF6A00",     // Alibaba orange
-  chatgpt: "#10A37F",   // OpenAI green
-  claude: "#D97757",    // Anthropic warm orange
-  gemini: "#4285F4",    // Google blue
-  grok: "#1A1A1A",      // X / Grok near-black
+  qwen: "#FF6A00", // Alibaba orange
+  chatgpt: "#10A37F", // OpenAI green
+  claude: "#D97757", // Anthropic warm orange
+  gemini: "#4285F4", // Google blue
+  grok: "#1A1A1A", // X / Grok near-black
 };
 
 /** Text color on top of `BADGE_BG`. White for all current providers;

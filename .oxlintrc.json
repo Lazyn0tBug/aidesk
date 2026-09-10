@@ -1,0 +1,74 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "categories": {
+    "correctness": "error",
+    "perf": "warn"
+  },
+  "rules": {
+    "no-console": "off",
+    "no-unused-vars": [
+      "warn",
+      {
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_",
+        "caughtErrorsIgnorePattern": "^_"
+      }
+    ],
+    "no-explicit-any": "warn",
+    "no-empty-function": "off",
+    "no-void": "off",
+    "no-plusplus": "off",
+    "eqeqeq": [
+      "error",
+      "always",
+      {
+        "null": "ignore"
+      }
+    ],
+    "prefer-const": "warn",
+    "typescript/no-invalid-void-type": "off",
+    "typescript/explicit-function-return-type": "off",
+    "typescript/explicit-module-boundary-types": "off",
+    "typescript/no-non-null-assertion": "off",
+    "typescript/no-use-before-define": "off",
+    "typescript/no-empty-object-type": "off",
+    "import/no-relative-parent-imports": "off",
+    "import/no-default-export": "off",
+    "import/unambiguous": "off",
+    "vue/max-props": "off"
+  },
+  "env": {
+    "browser": true,
+    "node": true,
+    "es2024": true
+  },
+  "globals": {
+    "defineProps": "readonly",
+    "defineEmits": "readonly",
+    "defineExpose": "readonly",
+    "withDefaults": "readonly"
+  },
+  "overrides": [
+    {
+      "files": [
+        "**/*.test.ts",
+        "**/*.test.vue",
+        "src/__test__/**"
+      ],
+      "rules": {
+        "typescript/no-non-null-assertion": "off",
+        "no-console": "off"
+      }
+    }
+  ],
+  "ignorePatterns": [
+    "node_modules",
+    "dist",
+    "src-tauri/target",
+    "src-tauri/gen",
+    "**/*.min.js",
+    "bun.lock",
+    "public/"
+  ],
+  "plugins": ["vue", "typescript", "import"]
+}

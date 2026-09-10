@@ -27,7 +27,12 @@ describe("normalizeTabBar (design §7.6)", () => {
   });
 
   it("disables both icon and name -> forces showName=true", () => {
-    const r = normalizeTabBar({ iconOnly: false, showIcon: false, showName: false, position: "top" });
+    const r = normalizeTabBar({
+      iconOnly: false,
+      showIcon: false,
+      showName: false,
+      position: "top",
+    });
     expect(r.showName).toBe(true);
   });
 });

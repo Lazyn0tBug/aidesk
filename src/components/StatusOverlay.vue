@@ -36,14 +36,18 @@ const loadingText = computed(() => {
         type="button"
         class="px-3.5 py-1.5 rounded-md border border-line bg-surface-2 text-ink hover:border-accent cursor-pointer font-sans"
         @click="emit('reload')"
-      >{{ messages.reload }}</button>
+      >
+        {{ messages.reload }}
+      </button>
     </template>
   </div>
 </template>
 
 <style scoped>
 @keyframes status-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 .status-overlay__spinner {
   border-radius: 9999px;

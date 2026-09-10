@@ -34,8 +34,8 @@
 
   /* font stack: prefers native UI fonts then CJK fallbacks (we render Chinese strings) */
   --font-sans:
-    "Inter", "Helvetica Neue", system-ui, -apple-system, "Segoe UI",
-    "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    "Inter", "Helvetica Neue", system-ui, -apple-system, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
 
   /* ring widths for focus outlines */
   --default-ring-width: 2px;

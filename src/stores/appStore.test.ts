@@ -22,16 +22,13 @@ const defaultInvoke = async (cmd: string) => {
 invokeMock.mockImplementation(defaultInvoke);
 
 vi.mock("../ipc", () => ({
-  createProviderWebview: (_id: string, _bounds: unknown) =>
-    invokeMock("create_provider_webview"),
-  showProviderWebview: (_id: string, _bounds: unknown) =>
-    invokeMock("show_provider_webview"),
+  createProviderWebview: (_id: string, _bounds: unknown) => invokeMock("create_provider_webview"),
+  showProviderWebview: (_id: string, _bounds: unknown) => invokeMock("show_provider_webview"),
   hideAllProviderWebviews: () => invokeMock("hide_all_provider_webviews"),
   setProviderWebviewBounds: (_id: string, _bounds: unknown) =>
     invokeMock("set_provider_webview_bounds"),
   reloadProviderWebview: (_id: string) => invokeMock("reload_provider_webview"),
-  setLastActiveProvider: (_providerId: string) =>
-    invokeMock("set_last_active_provider"),
+  setLastActiveProvider: (_providerId: string) => invokeMock("set_last_active_provider"),
   getAppConfig: () => invokeMock("get_app_config"),
   getEnabledProviders: () => invokeMock("get_enabled_providers"),
   getLastActiveProvider: () => invokeMock("get_last_active_provider"),

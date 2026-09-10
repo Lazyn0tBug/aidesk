@@ -4,17 +4,11 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { Bounds, ProviderId } from "../types";
 
-export function createProviderWebview(
-  providerId: ProviderId,
-  bounds: Bounds,
-): Promise<void> {
+export function createProviderWebview(providerId: ProviderId, bounds: Bounds): Promise<void> {
   return invoke<void>("create_provider_webview", { providerId, bounds });
 }
 
-export function showProviderWebview(
-  providerId: ProviderId,
-  bounds: Bounds,
-): Promise<void> {
+export function showProviderWebview(providerId: ProviderId, bounds: Bounds): Promise<void> {
   return invoke<void>("show_provider_webview", { providerId, bounds });
 }
 
@@ -26,10 +20,7 @@ export function hideAllProviderWebviews(): Promise<void> {
   return invoke<void>("hide_all_provider_webviews");
 }
 
-export function setProviderWebviewBounds(
-  providerId: ProviderId,
-  bounds: Bounds,
-): Promise<void> {
+export function setProviderWebviewBounds(providerId: ProviderId, bounds: Bounds): Promise<void> {
   return invoke<void>("set_provider_webview_bounds", { providerId, bounds });
 }
 

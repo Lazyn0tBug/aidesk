@@ -130,7 +130,13 @@ onUnmounted(() => {
         @click="onBack"
       >
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-          <path d="M10 3 L4.5 8 L10 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+          <path
+            d="M10 3 L4.5 8 L10 13"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
         </svg>
       </button>
       <button
@@ -141,7 +147,13 @@ onUnmounted(() => {
         @click="onForward"
       >
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-          <path d="M6 3 L11.5 8 L6 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+          <path
+            d="M6 3 L11.5 8 L6 13"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
         </svg>
       </button>
       <button
@@ -152,7 +164,13 @@ onUnmounted(() => {
         @click="onRefresh"
       >
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-          <path d="M13 8 a5 5 0 1 1 -1.5 -3.5 M13 2 V5 H10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+          <path
+            d="M13 8 a5 5 0 1 1 -1.5 -3.5 M13 2 V5 H10"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
         </svg>
       </button>
       <div class="mx-1 h-5 w-px bg-line pointer-events-none" aria-hidden="true" />
@@ -164,7 +182,12 @@ onUnmounted(() => {
         @click="onExit"
       >
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-          <path d="M4 4 L12 12 M12 4 L4 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+          <path
+            d="M4 4 L12 12 M12 4 L4 12"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linecap="round"
+          />
         </svg>
       </button>
     </div>
@@ -179,7 +202,9 @@ onUnmounted(() => {
         />
       </div>
       <div v-else class="absolute inset-0 flex items-center justify-center">
-        <div class="flex flex-col items-center gap-2 px-8 py-6 rounded-xl border border-line bg-surface-2">
+        <div
+          class="flex flex-col items-center gap-2 px-8 py-6 rounded-xl border border-line bg-surface-2"
+        >
           <img
             v-if="resolveIcon(provider.iconKey)"
             :src="resolveIcon(provider.iconKey)!.src"
@@ -188,10 +213,14 @@ onUnmounted(() => {
           />
           <h2 class="m-0 text-lg">{{ provider.name }}</h2>
           <p class="m-0 text-ink-2 text-[13px] break-all">{{ provider.url }}</p>
-          <p class="mt-1 mb-0 text-ink-2 text-[11px]">Provider window active — content renders in a child of the main window.</p>
+          <p class="mt-1 mb-0 text-ink-2 text-[11px]">
+            Provider window active — content renders in a child of the main window.
+          </p>
         </div>
       </div>
     </template>
-    <div v-else class="absolute inset-0 flex items-center justify-center text-ink-2">No provider available</div>
+    <div v-else class="absolute inset-0 flex items-center justify-center text-ink-2">
+      No provider available
+    </div>
   </main>
 </template>

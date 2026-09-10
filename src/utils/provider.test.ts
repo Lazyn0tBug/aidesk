@@ -42,9 +42,7 @@ describe("matchesProviderHost", () => {
   });
 
   it("matches when the current URL is a sub-path of the provider", () => {
-    expect(matchesProviderHost("https://chat.qwen.ai/chat/abc", provider)).toBe(
-      true,
-    );
+    expect(matchesProviderHost("https://chat.qwen.ai/chat/abc", provider)).toBe(true);
   });
 
   it("matches across schemes (http -> https is the same host)", () => {
@@ -54,9 +52,7 @@ describe("matchesProviderHost", () => {
   it("does not match when the current URL is on a different host", () => {
     // OAuth bounce to accounts.google.com — the common case that
     // triggered the active-tab "return home" feature in the first place.
-    expect(matchesProviderHost("https://accounts.google.com/", provider)).toBe(
-      false,
-    );
+    expect(matchesProviderHost("https://accounts.google.com/", provider)).toBe(false);
   });
 
   it("does not match a host that only shares a suffix", () => {
