@@ -384,8 +384,14 @@ pub async fn attach_toast_overlay<R: Runtime>(
     };
 
     if already_attached {
-        // Just resize the existing overlay.
+        // Just resize + reposition the existing overlay. Both are
+        // needed because window resize changes `bounds.height` and the
+        // top edge (bounds.y) might shift if the TabBar height
+        // changes too.
         let child = get_child_webview(&app, toast_label())?;
+        child
+            .set_position(LogicalPosition::new(0.0, bounds.y as f64))
+            .map_err(|e| AppError::WebviewBoundsFailed(format!("toast set_position: {e}")))?;
         child
             .set_size(LogicalSize::new(bounds.width as f64, bounds.height as f64))
             .map_err(|e| AppError::WebviewBoundsFailed(format!("toast set_size: {e}")))?;
@@ -396,14 +402,18 @@ pub async fn attach_toast_overlay<R: Runtime>(
     parent_window
         .add_child(
             // `Color(0,0,0,0)` makes the OS-level webview background
-            // transparent — without this, the overlay covers the TabBar
-            // and any other HTML behind it with the platform's default
-            // (usually white). The HTML body is also `background:
-            // transparent` for belt-and-suspenders, but the OS layer is
-            // the one that paints first.
+            // transparent. The HTML body is also `background:
+            // transparent`, but the OS layer paints first.
             WebviewBuilder::new(toast_label(), WebviewUrl::App("toast.html".into()))
                 .background_color(Color(0, 0, 0, 0)),
-            LogicalPosition::new(0.0, 0.0),
+            // Anchor at (0, bounds.y) — NOT (0, 0). Even with the
+            // HTML body's `pointer-events: none`, the native WKWebView
+            // / WebView2 view captures all input events within its
+            // bounds. Positioning the toast overlay at (0, 0) puts it
+            // over the TabBar and steals clicks from it. Starting at
+            // bounds.y (= tabBarHeight) keeps the overlay below the
+            // TabBar so clicks on the tabs reach the HTML button.
+            LogicalPosition::new(0.0, bounds.y as f64),
             LogicalSize::new(bounds.width as f64, bounds.height as f64),
         )
         .map_err(|e| AppError::WebviewCreateFailed(format!("toast add_child: {e}")))?;
