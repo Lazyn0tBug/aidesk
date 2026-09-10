@@ -1,0 +1,150 @@
+name: Build AIDesk
+
+# Build unsigned installers on Windows x64 and macOS (recent + previous
+# major) for every push to main, every PR, and manual dispatch. Code
+# signing + notarization aren't wired up — these artifacts are for
+# local QA / nightly builds. Add `APPLE_CERTIFICATE` /
+# `APPLE_CERTIFICATE_PASSWORD` / `APPLE_SIGNING_IDENTITY` and the
+# `WINDOWS_CERTIFICATE` base64 secret to enable signed builds.
+#
+# The `macos-private-api` Cargo feature (Tauri) only enables wry code
+# gated on `#[cfg(target_os = "macos")]`, so enabling it on the
+# Windows runner is a no-op there — no special-casing needed.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-macos:
+    name: macOS (${{ matrix.label }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-latest
+            label: latest
+          - runner: macos-14
+            label: 14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.runner == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || 'x86_64-apple-darwin' }}
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Install frontend dependencies
+        run: bun install --frozen-lockfile || bun install
+
+      - name: Type-check + bundle frontend
+        run: bun run build
+
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          # Unsigned build — leave these unset for now.
+          # APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          # APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          # APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        with:
+          args: --target ${{ matrix.runner == 'macos-latest' && 'aarch64-apple-darwin' || 'x86_64-apple-darwin' }}
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: aidesk-macos-${{ matrix.label }}
+          path: |
+            src-tauri/target/${{ matrix.runner == 'macos-latest' && 'aarch64-apple-darwin' || 'x86_64-apple-darwin' }}/release/bundle/dmg/*.dmg
+            src-tauri/target/${{ matrix.runner == 'macos-latest' && 'aarch64-apple-darwin' || 'x86_64-apple-darwin' }}/release/bundle/macos/*.app
+          if-no-files-found: warn
+
+  build-windows:
+    name: Windows (x64)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Install frontend dependencies
+        run: bun install --frozen-lockfile || bun install
+        shell: bash
+
+      - name: Type-check + bundle frontend
+        run: bun run build
+        shell: bash
+
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          # WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          # WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        with:
+          args: --target x86_64-pc-windows-msvc
+
+      # Tauri 2 doesn't have a native zip bundle target on Windows —
+      # only nsis (.exe installer) and msi (WiX). For a portable
+      # archive (raw .exe + DLLs + webview2 + bundled assets), we
+      # package the release directory ourselves. Compress-Archive is
+      # the built-in PowerShell cmdlet; no extra setup.
+      - name: Package portable Windows ZIP
+        shell: pwsh
+        run: |
+          $src = "src-tauri\target\x86_64-pc-windows-msvc\release"
+          $dst = "AIDesk-windows-x64"
+          if (Test-Path $dst) { Remove-Item $dst -Recurse -Force }
+          New-Item -ItemType Directory -Path $dst | Out-Null
+          # Copy the binary and any companion DLLs/PDBs/assets that
+          # Tauri emits next to it.
+          Get-ChildItem -Path $src -Filter "*.exe" | Copy-Item -Destination $dst
+          Get-ChildItem -Path $src -Filter "*.dll" | Copy-Item -Destination $dst -ErrorAction SilentlyContinue
+          # WebView2 runtime files if present (Tauri ships a fixed
+          # version when bundle > fixed_runtime).
+          if (Test-Path "$src\WebView2Loader.dll") {
+            Copy-Item "$src\WebView2Loader.dll" $dst
+          }
+          Compress-Archive -Path $dst -DestinationPath "AIDesk-windows-x64.zip"
+          Remove-Item $dst -Recurse -Force
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: aidesk-windows-x64
+          path: |
+            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi
+            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
+            AIDesk-windows-x64.zip
+          if-no-files-found: warn
