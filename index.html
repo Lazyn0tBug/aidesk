@@ -2,9 +2,27 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/icons/aidesk.png" />
+    <link rel="icon" type="png" href="/icons/aidesk.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AIDesk</title>
+    <!--
+      Preconnect hints — start DNS + TLS handshakes for the provider
+      hosts during app startup so the first navigation to each one
+      skips ~150-300ms of connection setup. The browser opens the
+      TCP/TLS connections in the background and pools them; once the
+      user actually switches to (or preloads) a tab, the request goes
+      straight to the existing connection.
+
+      Only the primary provider hosts go here — auth hosts (Google,
+      X, etc.) are reached via in-app navigation and don't benefit
+      from a startup preconnect. Adding more would just burn sockets.
+    -->
+    <link rel="preconnect" href="https://chat.qwen.ai" />
+    <link rel="preconnect" href="https://chatgpt.com" />
+    <link rel="preconnect" href="https://claude.ai" />
+    <link rel="preconnect" href="https://gemini.google.com" />
+    <link rel="preconnect" href="https://grok.com" />
+    <link rel="preconnect" href="https://x.com" />
   </head>
 
   <body>

@@ -18,7 +18,13 @@ import {
 } from "./stores/appStore";
 import { bindToastConfig, pushToast } from "./utils/toast";
 import { calculateWebViewBounds } from "./utils/bounds";
-import { attachToastOverlay, copyText, getAppConfig, getLastActiveProvider } from "./ipc";
+import {
+  attachToastOverlay,
+  copyText,
+  createProviderWebview,
+  getAppConfig,
+  getLastActiveProvider,
+} from "../src/ipc";
 import type { Bounds, ProviderId } from "./types";
 
 const store = useAppStore();
@@ -30,6 +36,57 @@ const loadError = ref<string | null>(null);
 // bounds when the user clicks a tab.
 const lastBounds = ref<Bounds | null>(null);
 
+/**
+ * Estimated initial bounds for preloading provider webviews before
+ * WebViewArea has measured itself. The TabBar is always `h-11`
+ * (= 44px at the design's default spacing), so we pass that
+ * explicitly — otherwise the default provider's webview would
+ * briefly cover the TabBar between preload and the first
+ * `onBounds` emission. DraftBox is hidden by default (`enabled:
+ * false` since 0.1.2), so we leave draftBoxHeight unset.
+ *
+ * These bounds are estimates — the real bounds arrive via
+ * `onBounds` once WebViewArea mounts and calls ResizeObserver.
+ * `updateActiveBounds` then re-positions the webview to match.
+ */
+function estimatedInitialBounds(): Bounds {
+  return calculateWebViewBounds({
+    windowWidth: window.innerWidth,
+    windowHeight: window.innerHeight,
+    tabBarHeight: 44,
+  });
+}
+
+/**
+ * Background-preload every enabled provider except the active one.
+ * Fire-and-forget — failures are logged but don't block the active
+ * provider. The eager preload in `onMounted` covers the active
+ * provider; this covers the rest so subsequent tab clicks are
+ * instant (no add_child + page load round-trip).
+ */
+async function preloadOtherProviders(bounds: Bounds): Promise<void> {
+  const activeId = store.activeProviderId;
+  const others = store.enabledProviders
+    .filter((p) => p.id !== activeId)
+    .filter((p) => {
+      const wv = store.webviews[p.id];
+      return wv && !wv.created;
+    });
+
+  await Promise.allSettled(
+    others.map((p) =>
+      createProviderWebview(p.id, bounds)
+        .then(() => {
+          const wv = store.webviews[p.id];
+          if (wv) wv.created = true;
+        })
+        .catch((err: unknown) => {
+          console.warn(`[aidesk] preload ${p.id} failed`, err);
+        }),
+    ),
+  );
+}
+
 onMounted(async () => {
   try {
     const [config, lastActive] = await Promise.all([
@@ -39,8 +96,35 @@ onMounted(async () => {
     hydrateStore(config, lastActive);
     if (store.config?.ui.toast) bindToastConfig(store.config.ui.toast);
 
+    // Eagerly preload the active provider so the first tab click is
+    // instant. We don't `show` here — that happens in `onBounds`
+    // once the WebViewArea has measured itself and emitted real
+    // bounds. `create_provider_webview` does the heavy lifting
+    // (add_child + URL fetch); without this the user sees a ~1-3s
+    // loading placeholder on first click.
+    const activeId = store.activeProviderId;
+    if (activeId) {
+      const wv = store.webviews[activeId];
+      if (wv && !wv.created) {
+        const bounds = estimatedInitialBounds();
+        createProviderWebview(activeId, bounds)
+          .then(() => {
+            wv.created = true;
+            // Background-preload the rest once the active is ready.
+            return preloadOtherProviders(bounds);
+          })
+          .catch((err: unknown) => {
+            console.error(`[aidesk] preload default ${activeId} failed`, err);
+          });
+      }
+    }
+
     // WebViewArea will emit bounds shortly after mount; when it does,
     // create + show the active provider (design §15.1 steps 12-13).
+    // If the eager preload already finished, the create is a no-op
+    // (Rust state.entries.contains_key short-circuits) and we just
+    // call show_provider_webview. If preload is still in flight,
+    // the show happens once the create resolves.
     // If no resize event fires (unlikely), the user can click any tab
     // to force creation.
   } catch (err) {
