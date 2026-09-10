@@ -99,7 +99,11 @@
       "claude.ai",
       "gemini.google.com",
       "grok.com",
-      "x.com"
+      "x.com",
+      "accounts.google.com",
+      "anthropic.com",
+      "auth.openai.com",
+      "aliyun.com"
     ]
   },
   "messages": {
