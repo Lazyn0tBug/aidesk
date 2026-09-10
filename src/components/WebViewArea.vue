@@ -6,11 +6,17 @@
 // available rectangle here so the parent can place it correctly. We do
 // not render any iframe or webview DOM directly — the actual content is
 // a native window from `WebviewWindowBuilder::parent("main")`.
+//
+// The thin toolbar at the top of the area holds the browser-history
+// controls (back / forward / refresh). It's an HTML overlay on top of
+// the embedded webview, not a separate row that would shrink the
+// webview's content area.
 
 import { computed, onMounted, onUnmounted } from "vue";
-import { activeWebview } from "../stores/appStore";
+import { activeProvider, activeWebview, useAppStore } from "../stores/appStore";
 import { resolveIcon } from "../utils/icons";
 import { calculateWebViewBounds } from "../utils/bounds";
+import { webviewBack, webviewForward, webviewRefresh } from "../ipc";
 import type { Bounds, MessagesSection, ProviderConfig } from "../types";
 import StatusOverlay from "./StatusOverlay.vue";
 
@@ -24,6 +30,7 @@ const emit = defineEmits<{
   (e: "bounds", b: Bounds): void;
 }>();
 
+const store = useAppStore();
 const webview = computed(() => activeWebview.value);
 
 const overlayState = computed<"loading" | "error" | null>(() => {
@@ -33,6 +40,26 @@ const overlayState = computed<"loading" | "error" | null>(() => {
   if (wv.loading) return "loading";
   return null;
 });
+
+// Toolbar handlers — eval JS in the active provider's webview. We don't
+// disable the buttons when history is empty: there's no way to know
+// without inspecting `webview.history()` (which Tauri 2 doesn't expose),
+// and a no-op `history.back()` is a small UX cost compared to querying
+// the browser for history length on every render.
+function onBack() {
+  const id = activeProvider.value?.id;
+  if (id) webviewBack(id).catch(() => {});
+}
+
+function onForward() {
+  const id = activeProvider.value?.id;
+  if (id) webviewForward(id).catch(() => {});
+}
+
+function onRefresh() {
+  const id = activeProvider.value?.id;
+  if (id) webviewRefresh(id).catch(() => {});
+}
 
 let resizeObserver: ResizeObserver | null = null;
 const onResize = () => {
@@ -76,6 +103,54 @@ onUnmounted(() => {
 
 <template>
   <main class="relative flex-1 min-h-0 overflow-hidden bg-surface">
+    <!--
+      Browser-history toolbar. Rendered as a top overlay on the
+      webview (absolute, ~36px tall) so it doesn't shrink the
+      webview's content area. Uses pointer-events: auto only on the
+      buttons themselves; the rest is pass-through so clicks reach
+      the underlying webview's chrome (e.g. the provider's own nav).
+    -->
+    <div
+      v-if="provider"
+      class="absolute top-0 left-0 right-0 z-10 flex items-center gap-1 px-2 py-1.5 bg-surface-2/85 backdrop-blur-sm border-b border-line pointer-events-none"
+      role="toolbar"
+      aria-label="Browser history"
+    >
+      <button
+        type="button"
+        class="size-7 inline-flex items-center justify-center rounded-md text-ink-2 hover:bg-surface-3 hover:text-ink cursor-pointer transition-colors pointer-events-auto"
+        title="Back"
+        aria-label="Go back"
+        @click="onBack"
+      >
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M10 3 L4.5 8 L10 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+      <button
+        type="button"
+        class="size-7 inline-flex items-center justify-center rounded-md text-ink-2 hover:bg-surface-3 hover:text-ink cursor-pointer transition-colors pointer-events-auto"
+        title="Forward"
+        aria-label="Go forward"
+        @click="onForward"
+      >
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M6 3 L11.5 8 L6 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+      <button
+        type="button"
+        class="size-7 inline-flex items-center justify-center rounded-md text-ink-2 hover:bg-surface-3 hover:text-ink cursor-pointer transition-colors pointer-events-auto"
+        title="Reload"
+        aria-label="Reload page"
+        @click="onRefresh"
+      >
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M13 8 a5 5 0 1 1 -1.5 -3.5 M13 2 V5 H10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+    </div>
+
     <template v-if="provider">
       <div v-if="overlayState" class="absolute inset-0">
         <StatusOverlay

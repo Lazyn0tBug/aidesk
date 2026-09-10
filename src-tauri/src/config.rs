@@ -238,7 +238,14 @@ pub struct SecurityConfig {
 impl Default for SecurityConfig {
     fn default() -> Self {
         Self {
-            allow_unknown_navigation: false,
+            // Permissive by default since 0.1.2. AIDesk only wraps
+            // trusted LLM provider sites, and the alternative (a
+            // host whitelist plus `OpenExternal` fallback) breaks
+            // every login flow that bounces through an OAuth identity
+            // provider. Operators who want stricter isolation can
+            // flip this back to `false` and rely on the whitelist +
+            // `globalAllowedHosts`.
+            allow_unknown_navigation: true,
             open_external_in_system_browser: true,
             global_allowed_hosts: vec![],
         }

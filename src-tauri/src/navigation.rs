@@ -26,6 +26,17 @@ pub fn decide(
         .host_str()
         .ok_or_else(|| AppError::NavigationBlocked(url.into()))?;
 
+    // Permissive mode (default since 0.1.2): skip the whitelist entirely
+    // when the operator has explicitly opted in via the security flag.
+    // AIDesk only wraps trusted LLM provider sites, and incremental
+    // whack-a-mole whitelisting of OAuth/auth subdomains is unsustainable
+    // — `accounts.google.com`, `auth.openai.com`, `anthropic.com`,
+    // `twitter.com`, `aliyun.com`, etc. all surfaced in practice and
+    // the list keeps growing.
+    if config.security.allow_unknown_navigation {
+        return Ok(NavigationDecision::Allow);
+    }
+
     let allowed = crate::providers::provider_allowed_hosts(config, provider);
     if crate::providers::is_host_allowed(&allowed, host) {
         return Ok(NavigationDecision::Allow);

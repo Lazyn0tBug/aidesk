@@ -220,8 +220,14 @@ references `bun run` for `beforeDevCommand` / `beforeBuildCommand`.
   boundary. Grant the minimum permission set the feature needs; prefer
   `core:webview:allow-<specific>` over `core:webview:default` once we know
   what we use.
-- Default-deny on outbound navigation. `navigation::decide` already
-  enforces the whitelist (§16); never add a blanket `Allow` path.
+- Navigation policy is governed by `security.allowUnknownNavigation`
+  (default `true` since 0.1.2 — AIDesk wraps trusted LLM provider sites,
+  and incremental whack-a-mole whitelisting of OAuth auth hosts
+  isn't sustainable). When set to `false`, `navigation::decide` enforces
+  the per-provider whitelist plus `security.globalAllowedHosts`; any
+  unmatched host falls back to `OpenExternal` (system browser) or
+  `Block` depending on `security.openExternalInSystemBrowser`. Operators
+  who want strict isolation can flip the flag back to `false`.
 - HTTPS-only URLs are validated in `config.rs` — keep it that way.
 - Frontend input is untrusted. Validate again in Rust for anything that
   hits disk, IPC, or navigation policy.

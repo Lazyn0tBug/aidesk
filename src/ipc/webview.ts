@@ -36,3 +36,27 @@ export function setProviderWebviewBounds(
 export function reloadProviderWebview(providerId: ProviderId): Promise<void> {
   return invoke<void>("reload_provider_webview", { providerId });
 }
+
+// Browser-history controls. The Rust side runs these as `eval` on the
+// provider webview, so they use the webview's own history stack — no
+// state to keep in sync on the Tauri side.
+export function webviewBack(providerId: ProviderId): Promise<void> {
+  return invoke<void>("eval_provider_webview", {
+    providerId,
+    js: "history.back()",
+  });
+}
+
+export function webviewForward(providerId: ProviderId): Promise<void> {
+  return invoke<void>("eval_provider_webview", {
+    providerId,
+    js: "history.forward()",
+  });
+}
+
+export function webviewRefresh(providerId: ProviderId): Promise<void> {
+  return invoke<void>("eval_provider_webview", {
+    providerId,
+    js: "location.reload()",
+  });
+}

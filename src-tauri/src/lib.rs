@@ -63,6 +63,8 @@ pub fn run() {
             webview_manager::hide_all_provider_webviews,
             webview_manager::set_provider_webview_bounds,
             webview_manager::reload_provider_webview,
+            webview_manager::attach_toast_overlay,
+            webview_manager::eval_provider_webview,
         ])
         .run(tauri::generate_context!())
         .expect("error while running AIDesk application");

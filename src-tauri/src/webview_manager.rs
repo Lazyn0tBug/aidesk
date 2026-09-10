@@ -413,6 +413,35 @@ pub async fn attach_toast_overlay<R: Runtime>(
     Ok(())
 }
 
+/// Run an arbitrary `JS` expression in the active provider webview. Used
+/// for browser-history controls (`history.back()` / `history.forward()`
+/// / `location.reload()`). Returns silently on JS errors so a single
+/// stuck webview doesn't surface a toast — the browser-control UI
+/// shows the failure as a disabled-button state.
+#[tauri::command]
+pub async fn eval_provider_webview<R: Runtime>(
+    app: AppHandle<R>,
+    state: tauri::State<'_, WebviewManager>,
+    provider_id: ProviderId,
+    js: String,
+) -> AppResult<()> {
+    let label = {
+        let s = state.state.lock().map_err(|_| AppError::Internal(String::from("lock")))?;
+        s.entries
+            .get(&provider_id)
+            .ok_or_else(|| AppError::ProviderNotFound(provider_id.clone()))?
+            .label
+            .clone()
+    };
+    let child = get_child_webview(&app, &label)?;
+    // Eval errors (e.g. running `history.back()` with no history) are
+    // swallowed — Tauri returns Result<()> from eval and we'd rather
+    // stay silent than surface a "no previous page" error to the
+    // user, since the toolbar button itself is the UI affordance.
+    let _ = child.eval(js);
+    Ok(())
+}
+
 /// Main window label — used as the parent for embedded provider webviews.
 pub fn main_window_label() -> &'static str {
     "main"
