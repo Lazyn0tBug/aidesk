@@ -1,9 +1,11 @@
 name: Build AIDesk
 
 # Build unsigned installers on Windows x64 and macOS (recent + previous
-# major) for every push to main, every PR, and manual dispatch. Code
-# signing + notarization aren't wired up — these artifacts are for
-# local QA / nightly builds. Add `APPLE_CERTIFICATE` /
+# major) for every push to main, every PR, and manual dispatch. On
+# tag push (e.g. `0.1.2`) the `release` job also creates a GitHub
+# Release and attaches all build artifacts. Code signing +
+# notarization aren't wired up — these artifacts are for local QA /
+# nightly builds. Add `APPLE_CERTIFICATE` /
 # `APPLE_CERTIFICATE_PASSWORD` / `APPLE_SIGNING_IDENTITY` and the
 # `WINDOWS_CERTIFICATE` base64 secret to enable signed builds.
 #
@@ -14,12 +16,14 @@ name: Build AIDesk
 on:
   push:
     branches: [main]
+    tags:
+      - "*"
   pull_request:
     branches: [main]
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-macos:
@@ -147,3 +151,35 @@ jobs:
             src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
             AIDesk-windows-x64.zip
           if-no-files-found: warn
+
+  # Runs only when the workflow is triggered by a tag push. Pulls the
+  # build artifacts from the jobs above and attaches them to a GitHub
+  # Release for that tag. `softprops/action-gh-release` will fail if
+  # the release already exists, which is the desired behavior (we
+  # never overwrite a release with new binaries).
+  release:
+    name: Attach binaries to GitHub Release
+    needs: [build-macos, build-windows]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List downloaded artifacts
+        run: ls -la artifacts/
+
+      - name: Create GitHub Release with attached binaries
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/aidesk-macos-latest/*
+            artifacts/aidesk-macos-14/*
+            artifacts/aidesk-windows-x64/*
+          generate_release_notes: true
+          fail_on_unmatched_files: true
