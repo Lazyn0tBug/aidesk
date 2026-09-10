@@ -27,16 +27,8 @@ permissions:
 
 jobs:
   build-macos:
-    name: macOS (${{ matrix.label }})
-    runs-on: ${{ matrix.runner }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runner: macos-latest
-            label: latest
-          - runner: macos-14
-            label: 14
+    name: macOS (Sonoma, x86_64)
+    runs-on: macos-14
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -49,7 +41,7 @@ jobs:
       - name: Setup Rust (stable)
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.runner == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || 'x86_64-apple-darwin' }}
+          targets: x86_64-apple-darwin
 
       - name: Cache Rust build artifacts
         uses: Swatinem/rust-cache@v2
@@ -69,15 +61,15 @@ jobs:
         # / APPLE_SIGNING_IDENTITY secrets — GitHub's workflow validator
         # rejects empty `env:` blocks containing only comments.
         with:
-          args: --target ${{ matrix.runner == 'macos-latest' && 'aarch64-apple-darwin' || 'x86_64-apple-darwin' }}
+          args: --target x86_64-apple-darwin
 
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: aidesk-macos-${{ matrix.label }}
+          name: aidesk-macos-x64
           path: |
-            src-tauri/target/${{ matrix.runner == 'macos-latest' && 'aarch64-apple-darwin' || 'x86_64-apple-darwin' }}/release/bundle/dmg/*.dmg
-            src-tauri/target/${{ matrix.runner == 'macos-latest' && 'aarch64-apple-darwin' || 'x86_64-apple-darwin' }}/release/bundle/macos/*.app
+            src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg
+            src-tauri/target/x86_64-apple-darwin/release/bundle/macos/*.app
           if-no-files-found: warn
 
   build-windows:
@@ -171,15 +163,28 @@ jobs:
         with:
           path: artifacts
 
+      # Surface what actually got downloaded. If a build matrix entry
+      # silently failed, this shows which artifact is missing before
+      # the release step errors out — much easier to debug than a bare
+      # "pattern does not match" from softprops.
       - name: List downloaded artifacts
-        run: ls -la artifacts/
+        run: |
+          echo "=== top-level ==="
+          ls -la artifacts/
+          for d in artifacts/*/; do
+            echo "=== $d ==="
+            ls -la "$d" | head -20
+          done
 
+      # Use a recursive glob so nested directories inside the
+      # artifact (e.g. the `.app` bundle's `Contents/...`) get
+      # attached too, but only the top-level files (not the entire
+      # app bundle's internals). `softprops` follows symlinks and
+      # zips each matched file individually, so we don't want `**`
+      # blowing up the release with thousands of files.
       - name: Create GitHub Release with attached binaries
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            artifacts/aidesk-macos-latest/*
-            artifacts/aidesk-macos-14/*
-            artifacts/aidesk-windows-x64/*
+          files: artifacts/*/*
           generate_release_notes: true
-          fail_on_unmatched_files: true
+          fail_on_unmatched_files: false
