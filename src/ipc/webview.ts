@@ -60,3 +60,12 @@ export function webviewRefresh(providerId: ProviderId): Promise<void> {
     js: "location.reload()",
   });
 }
+
+/**
+ * Current URL of the provider's webview. Returns "" if the webview
+ * hasn't loaded yet — callers should treat empty as "unknown" and
+ * fall through to a safe default rather than passing it to `new URL`.
+ */
+export function webviewUrl(providerId: ProviderId): Promise<string> {
+  return invoke<string>("webview_url", { providerId });
+}

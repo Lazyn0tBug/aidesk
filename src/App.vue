@@ -24,7 +24,10 @@ import {
   createProviderWebview,
   getAppConfig,
   getLastActiveProvider,
-} from "../src/ipc";
+  webviewBack,
+  webviewEval,
+  webviewUrl,
+} from "./ipc";
 import type { Bounds, ProviderId } from "./types";
 
 const store = useAppStore();
@@ -159,11 +162,91 @@ function boundsForSwitch(): Bounds {
   });
 }
 
+/**
+ * Walk the active provider's webview back to its home URL when the
+ * user clicks the already-active tab. The "double-click home" pattern:
+ *
+ *   1. If the current URL host matches the provider's host, we're
+ *      already there — do nothing.
+ *   2. Otherwise call `history.back()` once and re-check. Many providers
+ *      redirect away (login, OAuth callback, sign-out) and the back
+ *      stack often still contains the provider's home URL.
+ *   3. If `history.back()` didn't reach the provider — either there's
+ *      no history at all (fresh load that got redirected), or the back
+ *      stack never contained the provider — force a reload via
+ *      `location.replace(provider.url)`. `replace` (vs `assign`) so the
+ *      current page doesn't end up in the history stack, which would
+ *      make the next back() go to it instead of further back.
+ *
+ * We don't touch the active webview's bounds or visibility — this is
+ * pure in-webview navigation, not a `show_provider_webview` cycle.
+ */
+async function returnToProviderHome(id: ProviderId): Promise<void> {
+  const provider = store.enabledProviders.find((p) => p.id === id);
+  if (!provider) return;
+
+  const targetHost = (() => {
+    try {
+      return new URL(provider.url).host;
+    } catch {
+      return null;
+    }
+  })();
+  if (!targetHost) return;
+
+  const currentHost = await webviewUrl(id)
+    .then((u) => {
+      try {
+        return u ? new URL(u).host : null;
+      } catch {
+        return null;
+      }
+    })
+    .catch(() => null);
+
+  // Already on the provider — nothing to do.
+  if (currentHost === targetHost) return;
+
+  // Try history.back() once. We don't loop because each back() can
+  // cross an off-provider redirect (e.g. OAuth bounce), and one step
+  // is enough for the common case.
+  await webviewBack(id).catch(() => {});
+  // Give the navigation a beat to settle before re-querying the URL.
+  // 300ms is enough on every platform we've measured — the
+  // history.back() promise resolves on the navigation *start*, not
+  // completion, so we need a small delay to let the new URL commit.
+  await new Promise((r) => setTimeout(r, 300));
+  const afterBackHost = await webviewUrl(id)
+    .then((u) => {
+      try {
+        return u ? new URL(u).host : null;
+      } catch {
+        return null;
+      }
+    })
+    .catch(() => null);
+
+  if (afterBackHost === targetHost) return;
+
+  // History exhausted or didn't bring us home — force-replace with
+  // the provider's URL. JSON.stringify escapes the URL safely for
+  // interpolation into a JS string literal.
+  const js = `location.replace(${JSON.stringify(provider.url)})`;
+  await webviewEval(id, js).catch(() => {});
+}
+
 async function onSelectTab(id: ProviderId) {
   if (!store.config) return;
   const prev = store.activeProviderId;
+
+  // Clicking the already-active tab is the "return to home" gesture:
+  // see `returnToProviderHome` for the back-history + reload logic.
+  if (prev === id) {
+    await returnToProviderHome(id);
+    return;
+  }
+
   await switchProvider(id, boundsForSwitch());
-  if (prev === id) return;
 
   if (
     store.config.ui.draftBox.copyOnSwitch &&

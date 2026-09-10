@@ -452,6 +452,36 @@ pub async fn eval_provider_webview<R: Runtime>(
     Ok(())
 }
 
+/// Return the current URL of a provider webview as a string. Used by
+/// the active-tab "return-to-home" handler in App.vue to decide
+/// whether the user is still on the provider's host (no action) or
+/// has been redirected (walk history back, then reload).
+///
+/// Returns an empty string if the webview hasn't loaded a page yet
+/// (so `new URL('') instanceof URL` is invalid and the caller falls
+/// through to the reload branch — safer than `Option<String>` for the
+/// JS-interop side).
+#[tauri::command]
+pub async fn webview_url<R: Runtime>(
+    app: AppHandle<R>,
+    state: tauri::State<'_, WebviewManager>,
+    provider_id: ProviderId,
+) -> AppResult<String> {
+    let label = {
+        let s = state.state.lock().map_err(|_| AppError::Internal(String::from("lock")))?;
+        s.entries
+            .get(&provider_id)
+            .ok_or_else(|| AppError::ProviderNotFound(provider_id.clone()))?
+            .label
+            .clone()
+    };
+    let child = get_child_webview(&app, &label)?;
+    child
+        .url()
+        .map(|u| u.to_string())
+        .map_err(|e| AppError::WebviewCreateFailed(format!("webview_url: {e}")))
+}
+
 /// Main window label — used as the parent for embedded provider webviews.
 pub fn main_window_label() -> &'static str {
     "main"
