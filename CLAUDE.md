@@ -362,8 +362,10 @@ Each phase ships behind a single commit and verifies against the matching
   the system browser when `security.openExternalInSystemBrowser` is
   true; for now block-only matches §4.6 #6 when that flag is false.
 - The frontend lazily creates webviews on first switch (design §4.3
-  #2). The active provider is created eagerly on startup once
-  `WebViewArea` emits its first bounds.
+  #1/#2, §15.1 #1). No webview — including the active provider — is
+  created at startup; the first one is created in `onBounds` once
+  `WebViewArea` has measured itself and emitted real bounds, and
+  subsequent ones are created when the user clicks their tab.
 - "At most one visible WebView" (design §3.1 #4, §4.3 #6) is enforced
   inside `show_provider_webview`: it hides the previously-visible
   provider in the same call rather than requiring a separate
